@@ -1,0 +1,64 @@
+{
+  "name": "nexora-kiosco",
+  "version": "1.0.0",
+  "description": "Software de punto de venta para kioscos argentinos",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "package": "electron-vite build && electron-builder",
+    "postinstall": "electron-rebuild -f -w better-sqlite3",
+    "lint": "eslint src --ext .js,.jsx"
+  },
+  "dependencies": {
+    "@electron-toolkit/utils": "^4.0.0",
+    "better-sqlite3": "^11.10.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.23.1"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
+    "@vitejs/plugin-react": "^4.3.0",
+    "autoprefixer": "^10.4.19",
+    "cross-env": "^10.1.0",
+    "electron": "^33.4.11",
+    "electron-builder": "^24.13.3",
+    "electron-vite": "^2.3.0",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.4",
+    "vite": "^5.3.1"
+  },
+  "build": {
+    "appId": "com.nexora.kiosco",
+    "productName": "Nexora Kiosco",
+    "copyright": "Copyright © 2026 Nexora",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.ico"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "resources/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "resources/icon.ico",
+      "installerLanguages": [
+        "es_AR"
+      ]
+    }
+  }
+}
