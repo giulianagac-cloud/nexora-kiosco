@@ -30,7 +30,7 @@ export default function Venta() {
   const buscar = useCallback(async (texto) => {
     setBusqueda(texto)
     if (texto.length < 2) { setResultados([]); return }
-    const res = await window.api.productos.listar({ busqueda: texto })
+    const res = await window.api.productos.listar({ busqueda: texto, estado: 'activo' })
     setResultados(res)
   }, [])
 

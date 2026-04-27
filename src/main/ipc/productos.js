@@ -9,12 +9,16 @@ export function registerProductosHandlers(ipcMain, db) {
     const params = []
 
     if (filtros.busqueda) {
-      query += ' AND (p.nombre LIKE ? OR p.codigo_barras = ?)'
-      params.push(`%${filtros.busqueda}%`, filtros.busqueda)
+      query += ' AND (p.nombre LIKE ? OR p.codigo_barras LIKE ?)'
+      params.push(`%${filtros.busqueda}%`, `%${filtros.busqueda}%`)
     }
     if (filtros.categoria_id) {
       query += ' AND p.categoria_id = ?'
       params.push(filtros.categoria_id)
+    }
+    if (filtros.estado) {
+      query += ' AND p.estado = ?'
+      params.push(filtros.estado)
     }
 
     query += ' ORDER BY p.nombre ASC'
@@ -23,14 +27,23 @@ export function registerProductosHandlers(ipcMain, db) {
 
   ipcMain.handle('productos:buscar-codigo', (_, codigo) => {
     return db
-      .prepare('SELECT * FROM productos WHERE codigo_barras = ? AND activo = 1')
+      .prepare(`SELECT * FROM productos WHERE codigo_barras = ? AND activo = 1 AND estado = 'activo'`)
       .get(codigo) ?? null
   })
 
   ipcMain.handle('productos:crear', (_, producto) => {
     const stmt = db.prepare(`
-      INSERT INTO productos (nombre, codigo_barras, precio, stock, stock_minimo, categoria_id)
-      VALUES (@nombre, @codigo_barras, @precio, @stock, @stock_minimo, @categoria_id)
+      INSERT INTO productos (
+        nombre, codigo_barras, precio, precio_costo, iva,
+        utilidad_minorista, utilidad_mayorista, precio_mayorista,
+        stock, stock_minimo, stock_maximo, control_stock,
+        unidad_venta, en_oferta, categoria_id, estado
+      ) VALUES (
+        @nombre, @codigo_barras, @precio, @precio_costo, @iva,
+        @utilidad_minorista, @utilidad_mayorista, @precio_mayorista,
+        @stock, @stock_minimo, @stock_maximo, @control_stock,
+        @unidad_venta, @en_oferta, @categoria_id, @estado
+      )
     `)
     const result = stmt.run(producto)
     return { id: result.lastInsertRowid, ...producto }
@@ -40,15 +53,28 @@ export function registerProductosHandlers(ipcMain, db) {
     const campos = Object.keys(datos)
       .map((k) => `${k} = @${k}`)
       .join(', ')
-    db.prepare(`UPDATE productos SET ${campos}, updated_at = datetime('now','localtime') WHERE id = @id`).run({
-      ...datos,
-      id
-    })
+    db.prepare(
+      `UPDATE productos SET ${campos}, updated_at = datetime('now','localtime') WHERE id = @id`
+    ).run({ ...datos, id })
     return db.prepare('SELECT * FROM productos WHERE id = ?').get(id)
   })
 
   ipcMain.handle('productos:eliminar', (_, id) => {
     db.prepare("UPDATE productos SET activo = 0 WHERE id = ?").run(id)
+    return { ok: true }
+  })
+
+  ipcMain.handle('productos:discontinuar', (_, id) => {
+    db.prepare(
+      `UPDATE productos SET estado = 'discontinuado', updated_at = datetime('now','localtime') WHERE id = ?`
+    ).run(id)
+    return { ok: true }
+  })
+
+  ipcMain.handle('productos:reactivar', (_, id) => {
+    db.prepare(
+      `UPDATE productos SET estado = 'activo', updated_at = datetime('now','localtime') WHERE id = ?`
+    ).run(id)
     return { ok: true }
   })
 
@@ -63,7 +89,11 @@ export function registerProductosHandlers(ipcMain, db) {
 
   ipcMain.handle('productos:stock-bajo', () => {
     return db
-      .prepare('SELECT * FROM productos WHERE activo = 1 AND stock <= stock_minimo AND stock_minimo > 0')
+      .prepare(
+        `SELECT * FROM productos
+         WHERE activo = 1 AND estado = 'activo'
+           AND control_stock = 1 AND stock <= stock_minimo AND stock_minimo > 0`
+      )
       .all()
   })
 }
