@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 const MEDIOS_PAGO = [
   { value: 'efectivo', label: 'Efectivo' },
@@ -13,6 +14,8 @@ function formatPrecio(n) {
 }
 
 export default function Venta() {
+  const navigate = useNavigate()
+  const [cajaAbierta, setCajaAbierta] = useState(null) // null=checking, false=closed, true=open
   const [busqueda, setBusqueda] = useState('')
   const [resultados, setResultados] = useState([])
   const [carrito, setCarrito] = useState([])
@@ -24,8 +27,12 @@ export default function Venta() {
   const total = carrito.reduce((s, i) => s + i.precio * i.cantidad, 0)
 
   useEffect(() => {
-    inputRef.current?.focus()
+    window.api.caja.estado().then((s) => setCajaAbierta(Boolean(s)))
   }, [])
+
+  useEffect(() => {
+    if (cajaAbierta) inputRef.current?.focus()
+  }, [cajaAbierta])
 
   const buscar = useCallback(async (texto) => {
     setBusqueda(texto)
@@ -99,6 +106,42 @@ export default function Venta() {
       if (exacto) { agregarAlCarrito(exacto); return }
       if (resultados.length === 1) agregarAlCarrito(resultados[0])
     }
+  }
+
+  // ── Caja bloqueada ────────────────────────────────────────────────────────
+  if (cajaAbierta === null) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#1a1f2e]">
+        <p className="text-slate-500 text-sm">Verificando caja...</p>
+      </div>
+    )
+  }
+
+  if (!cajaAbierta) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#1a1f2e]">
+        <div className="text-center">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#2d3348]">
+            <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-bold text-white mb-1">Caja cerrada</h2>
+          <p className="text-sm text-slate-400 mb-6 max-w-xs">
+            Para registrar ventas primero tenés que abrir la caja.
+          </p>
+          <button
+            onClick={() => navigate('/caja')}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition shadow-lg shadow-emerald-900/30"
+          >
+            Ir a Caja
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (

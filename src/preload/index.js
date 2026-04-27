@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('api', {
     cerrar: (sesionId) => invoke('caja:cerrar', sesionId),
     movimiento: (datos) => invoke('caja:movimiento', datos),
     movimientos: (sesionId) => invoke('caja:movimientos', sesionId),
+    saldoSesion: (sesionId) => invoke('caja:saldo-sesion', sesionId),
     historial: (limite) => invoke('caja:historial', limite)
   },
 
