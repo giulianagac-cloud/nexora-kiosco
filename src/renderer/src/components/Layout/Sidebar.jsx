@@ -39,7 +39,7 @@ const NAV = [
   }
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ usuario, onLogout }) {
   return (
     <aside className="w-56 bg-sidebar flex flex-col shrink-0">
       <div className="px-5 py-5 border-b border-slate-700">
@@ -55,7 +55,7 @@ export default function Sidebar() {
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-emerald-600 text-white'
                   : 'text-slate-300 hover:bg-sidebar-hover hover:text-white'
               }`
             }
@@ -66,8 +66,25 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div className="px-4 py-3 border-t border-slate-700">
-        <p className="text-slate-500 text-xs">v1.0.0</p>
+      <div className="px-4 py-3 border-t border-slate-700 space-y-2">
+        {usuario && (
+          <div className="flex items-center gap-2 mb-1">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-xs font-bold text-white">
+              {usuario.nombre.charAt(0).toUpperCase()}
+            </div>
+            <span className="truncate text-xs font-medium text-slate-300">{usuario.nombre}</span>
+          </div>
+        )}
+        <button
+          onClick={onLogout}
+          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          Cerrar sesión
+        </button>
+        <p className="text-slate-600 text-xs">v1.0.0</p>
       </div>
     </aside>
   )

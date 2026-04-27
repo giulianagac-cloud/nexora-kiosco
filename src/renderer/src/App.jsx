@@ -1,14 +1,22 @@
+import { useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from '@/components/Layout/Sidebar'
 import Venta from '@/pages/Venta'
 import Productos from '@/pages/Productos'
 import Historial from '@/pages/Historial'
 import Caja from '@/pages/Caja'
+import Login from '@/pages/Login'
 
 export default function App() {
+  const [usuario, setUsuario] = useState(null)
+
+  if (!usuario) {
+    return <Login onLogin={setUsuario} />
+  }
+
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar />
+      <Sidebar usuario={usuario} onLogout={() => setUsuario(null)} />
       <main className="flex-1 overflow-auto">
         <Routes>
           <Route path="/" element={<Navigate to="/venta" replace />} />
