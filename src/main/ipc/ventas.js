@@ -55,15 +55,16 @@ export function registerVentasHandlers(ipcMain, db) {
     return crearVenta()
   })
 
-  ipcMain.handle('ventas:listar', (_, { fecha_desde, fecha_hasta, limite = 50 } = {}) => {
+  ipcMain.handle('ventas:listar', (_, { fecha_desde, fecha_hasta, limite = 50, incluir_anuladas = false } = {}) => {
     let query = `
       SELECT v.*, COUNT(d.id) AS cantidad_items
       FROM ventas v
       LEFT JOIN detalle_ventas d ON v.id = d.venta_id
-      WHERE v.anulada = 0
+      WHERE 1=1
     `
     const params = []
 
+    if (!incluir_anuladas) query += ' AND v.anulada = 0'
     if (fecha_desde) { query += ' AND date(v.fecha) >= ?'; params.push(fecha_desde) }
     if (fecha_hasta) { query += ' AND date(v.fecha) <= ?'; params.push(fecha_hasta) }
 
@@ -71,6 +72,35 @@ export function registerVentasHandlers(ipcMain, db) {
     params.push(limite)
 
     return db.prepare(query).all(...params)
+  })
+
+  ipcMain.handle('ventas:resumen-periodo', (_, { fecha_desde, fecha_hasta } = {}) => {
+    const filtroParts = []
+    const params = []
+    if (fecha_desde) { filtroParts.push("date(v.fecha) >= ?"); params.push(fecha_desde) }
+    if (fecha_hasta) { filtroParts.push("date(v.fecha) <= ?"); params.push(fecha_hasta) }
+    const filtro = filtroParts.length ? ' AND ' + filtroParts.join(' AND ') : ''
+
+    const resumen = db.prepare(`
+      SELECT
+        COUNT(CASE WHEN v.anulada = 0 THEN 1 END)                                AS total_ventas,
+        COALESCE(SUM(CASE WHEN v.anulada = 0 THEN v.total ELSE 0 END), 0)        AS monto_total,
+        COUNT(CASE WHEN v.anulada = 1 THEN 1 END)                                AS total_anuladas
+      FROM ventas v
+      WHERE 1=1 ${filtro}
+    `).get(...params)
+
+    const ganancia = db.prepare(`
+      SELECT COALESCE(
+        SUM((dv.precio_unitario - COALESCE(p.precio_costo, 0)) * dv.cantidad), 0
+      ) AS ganancia
+      FROM detalle_ventas dv
+      JOIN ventas v ON dv.venta_id = v.id
+      LEFT JOIN productos p ON dv.producto_id = p.id
+      WHERE v.anulada = 0 ${filtro}
+    `).get(...params)
+
+    return { ...resumen, ganancia_estimada: ganancia?.ganancia ?? 0 }
   })
 
   ipcMain.handle('ventas:detalle', (_, ventaId) => {

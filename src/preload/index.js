@@ -24,7 +24,8 @@ contextBridge.exposeInMainWorld('api', {
     listar: (filtros) => invoke('ventas:listar', filtros),
     detalle: (id) => invoke('ventas:detalle', id),
     anular: (id) => invoke('ventas:anular', id),
-    resumenHoy: () => invoke('ventas:resumen-hoy')
+    resumenHoy: () => invoke('ventas:resumen-hoy'),
+    resumenPeriodo: (filtros) => invoke('ventas:resumen-periodo', filtros)
   },
 
   caja: {
