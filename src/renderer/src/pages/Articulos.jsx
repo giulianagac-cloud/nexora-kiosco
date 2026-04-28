@@ -49,6 +49,8 @@ export default function Articulos() {
   const [form, setForm] = useState(FORM_VACIO)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
+  const [importando, setImportando] = useState(false)
+  const [resultImport, setResultImport] = useState(null)
 
   useEffect(() => { cargarDatos() }, [])
 
@@ -174,6 +176,21 @@ export default function Articulos() {
     }
   }
 
+  async function importarExcel() {
+    setImportando(true)
+    try {
+      const resultado = await window.api.importar.excel()
+      if (resultado) {
+        setResultImport(resultado)
+        await cargarDatos()
+      }
+    } catch (e) {
+      setResultImport({ error: e.message })
+    } finally {
+      setImportando(false)
+    }
+  }
+
   async function toggleDiscontinuar() {
     if (!selectedItem) return
     if (selectedItem.estado === 'discontinuado') {
@@ -196,6 +213,23 @@ export default function Articulos() {
           <p className="text-sm text-slate-400 mt-0.5">{productos.length} artículos registrados</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={importarExcel}
+            disabled={importando}
+            className={CLS_BTN_GHOST}
+          >
+            {importando ? (
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+            )}
+            {importando ? 'Importando...' : 'Importar Excel'}
+          </button>
           <button onClick={abrirEditar} disabled={!selectedId} className={CLS_BTN_GHOST}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -331,7 +365,76 @@ export default function Articulos() {
         </div>
       </div>
 
-      {/* ── Modal ── */}
+      {/* ── Modal resultado importación ── */}
+      {resultImport && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl border border-[#2d3348] bg-[#1e2334] shadow-2xl p-6">
+            {resultImport.error ? (
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-500/15 shrink-0">
+                    <svg className="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-white font-semibold text-lg">Error en la importación</h2>
+                </div>
+                <p className="text-rose-300 text-sm mb-5">{resultImport.error}</p>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/15 shrink-0">
+                    <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-white font-semibold text-lg">Importación completada</h2>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-center">
+                    <p className="text-2xl font-bold text-emerald-400">{resultImport.insertados}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Nuevos</p>
+                  </div>
+                  <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-3 text-center">
+                    <p className="text-2xl font-bold text-blue-400">{resultImport.actualizados}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Actualizados</p>
+                  </div>
+                  <div className="rounded-xl bg-slate-500/10 border border-slate-500/20 p-3 text-center">
+                    <p className="text-2xl font-bold text-slate-400">{resultImport.omitidos}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Omitidos</p>
+                  </div>
+                </div>
+
+                {resultImport.errores?.length > 0 && (
+                  <div className="mb-4 rounded-xl border border-rose-800/40 bg-rose-950/30 p-3">
+                    <p className="text-xs font-semibold text-rose-400 mb-2">
+                      {resultImport.errores.length} fila{resultImport.errores.length > 1 ? 's' : ''} con error
+                    </p>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {resultImport.errores.map((e, i) => (
+                        <div key={i} className="text-xs text-rose-300">
+                          Fila {e.fila}: {e.motivo}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            <button
+              onClick={() => setResultImport(null)}
+              className="w-full py-2.5 rounded-xl bg-[#2a2f42] hover:bg-[#323850] border border-[#2d3348] text-slate-200 text-sm font-medium transition"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal artículo ── */}
       {modal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div

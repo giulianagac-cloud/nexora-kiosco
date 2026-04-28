@@ -37,6 +37,10 @@ contextBridge.exposeInMainWorld('api', {
     historial: (limite) => invoke('caja:historial', limite)
   },
 
+  importar: {
+    excel: () => invoke('importar:excel')
+  },
+
   config: {
     get: (clave) => invoke('configuracion:get', clave),
     getAll: () => invoke('configuracion:getAll'),

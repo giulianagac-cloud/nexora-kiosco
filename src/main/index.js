@@ -5,6 +5,7 @@ import { initDatabase } from './database/db'
 import { registerProductosHandlers } from './ipc/productos'
 import { registerVentasHandlers } from './ipc/ventas'
 import { registerCajaHandlers } from './ipc/caja'
+import { registerImportarHandlers } from './ipc/importar'
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -44,6 +45,7 @@ app.whenReady().then(() => {
   registerProductosHandlers(ipcMain, db)
   registerVentasHandlers(ipcMain, db)
   registerCajaHandlers(ipcMain, db)
+  registerImportarHandlers(ipcMain, db)
 
   createWindow()
 
