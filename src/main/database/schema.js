@@ -45,7 +45,8 @@ export function createSchema(db) {
       sesion_id     INTEGER REFERENCES caja_sesiones(id),
       total         REAL NOT NULL,
       descuento     REAL NOT NULL DEFAULT 0,
-      medio_pago    TEXT NOT NULL DEFAULT 'efectivo' CHECK(medio_pago IN ('efectivo','debito','credito','mercadopago','transferencia')),
+      medio_pago    TEXT NOT NULL DEFAULT 'efectivo' CHECK(medio_pago IN ('efectivo','debito','credito','mercadopago','transferencia','mixto')),
+      medio_pago_detalle TEXT,
       fecha         TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       anulada       INTEGER NOT NULL DEFAULT 0
     );
@@ -75,8 +76,40 @@ export function createSchema(db) {
     );
   `)
 
+  migrateVentas(db)
   migrateProductos(db)
   seedInitialData(db)
+}
+
+function migrateVentas(db) {
+  const columnas = db.prepare("PRAGMA table_info(ventas)").all().map((c) => c.name)
+  if (!columnas.includes('medio_pago_detalle')) {
+    db.exec('BEGIN TRANSACTION')
+    try {
+      db.exec(`
+        CREATE TABLE ventas_new (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          sesion_id     INTEGER REFERENCES caja_sesiones(id),
+          total         REAL NOT NULL,
+          descuento     REAL NOT NULL DEFAULT 0,
+          medio_pago    TEXT NOT NULL DEFAULT 'efectivo' CHECK(medio_pago IN ('efectivo','debito','credito','mercadopago','transferencia','mixto')),
+          medio_pago_detalle TEXT,
+          fecha         TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+          anulada       INTEGER NOT NULL DEFAULT 0
+        );
+      `)
+      db.exec(`
+        INSERT INTO ventas_new (id, sesion_id, total, descuento, medio_pago, fecha, anulada)
+        SELECT id, sesion_id, total, descuento, medio_pago, fecha, anulada FROM ventas;
+      `)
+      db.exec('DROP TABLE ventas;')
+      db.exec('ALTER TABLE ventas_new RENAME TO ventas;')
+      db.exec('COMMIT')
+    } catch (error) {
+      db.exec('ROLLBACK')
+      throw error
+    }
+  }
 }
 
 // Adds new columns to existing DBs — safe to run repeatedly (errors are swallowed)

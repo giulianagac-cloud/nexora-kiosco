@@ -1,16 +1,26 @@
 export function registerVentasHandlers(ipcMain, db) {
-  ipcMain.handle('ventas:crear', (_, { items, total, descuento, medio_pago, sesion_id }) => {
+  ipcMain.handle('ventas:crear', (_, { items, total, descuento, medio_pago, medio_pago_detalle }) => {
     const sesionActiva = db
       .prepare("SELECT id FROM caja_sesiones WHERE estado = 'abierta' LIMIT 1")
       .get()
 
+    if (!sesionActiva) {
+      throw new Error('La caja está cerrada. Abre la caja para registrar ventas.')
+    }
+
     const crearVenta = db.transaction(() => {
       const venta = db
         .prepare(`
-          INSERT INTO ventas (sesion_id, total, descuento, medio_pago)
-          VALUES (?, ?, ?, ?)
+          INSERT INTO ventas (sesion_id, total, descuento, medio_pago, medio_pago_detalle)
+          VALUES (?, ?, ?, ?, ?)
         `)
-        .run(sesionActiva?.id ?? null, total, descuento ?? 0, medio_pago)
+        .run(
+          sesionActiva.id,
+          total,
+          descuento ?? 0,
+          medio_pago,
+          medio_pago_detalle ?? null
+        )
 
       const ventaId = venta.lastInsertRowid
 

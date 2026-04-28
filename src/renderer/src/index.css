@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Print: solo muestra el ticket, oculta el resto ── */
+@media print {
+  body > * { visibility: hidden; }
+  .print-ticket { visibility: visible; position: fixed; inset: 0; display: flex; justify-content: center; }
+  .print-ticket * { visibility: visible; }
+}
+
 @layer base {
   * {
     -webkit-font-smoothing: antialiased;
@@ -9,7 +16,7 @@
     box-sizing: border-box;
   }
   body {
-    @apply bg-gray-100 text-gray-900;
+    @apply bg-[#1a1f2e] text-slate-100;
     font-family: 'Inter', system-ui, sans-serif;
     user-select: none;
     overflow: hidden;
