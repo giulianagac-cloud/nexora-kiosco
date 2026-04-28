@@ -74,6 +74,31 @@ export function createSchema(db) {
       clave TEXT PRIMARY KEY,
       valor TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS usuarios (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre        TEXT NOT NULL,
+      usuario       TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      rol           TEXT NOT NULL DEFAULT 'operador' CHECK(rol IN ('admin','operador')),
+      activo        INTEGER NOT NULL DEFAULT 1,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS listas_precios (
+      id      INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre  TEXT NOT NULL,
+      tipo    TEXT NOT NULL DEFAULT 'custom',
+      activa  INTEGER NOT NULL DEFAULT 0,
+      orden   INTEGER NOT NULL UNIQUE
+    );
+
+    CREATE TABLE IF NOT EXISTS tarjetas (
+      id      INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre  TEXT NOT NULL UNIQUE,
+      tipo    TEXT NOT NULL CHECK(tipo IN ('credito','debito')),
+      activa  INTEGER NOT NULL DEFAULT 1
+    );
   `)
 
   migrateVentas(db)
@@ -138,12 +163,53 @@ function seedInitialData(db) {
 
   const configDefaults = [
     ['negocio_nombre', 'Mi Kiosco'],
+    ['negocio_razon_social', ''],
+    ['negocio_nombre_comercial', 'Mi Kiosco'],
+    ['negocio_cuit', ''],
+    ['negocio_condicion_iva', 'monotributo'],
+    ['negocio_domicilio', ''],
     ['negocio_direccion', ''],
     ['negocio_telefono', ''],
+    ['negocio_email', ''],
+    ['negocio_web', ''],
+    ['negocio_logo', ''],
     ['moneda_simbolo', '$'],
     ['imprimir_ticket', '0'],
-    ['alertar_stock_minimo', '1']
+    ['alertar_stock_minimo', '1'],
+    ['ticket_ancho', '80'],
+    ['ticket_pie_texto', '¡Gracias por su compra!'],
+    ['comprobante_predeterminado', 'ticket'],
   ]
   const insertConf = db.prepare('INSERT OR IGNORE INTO configuracion (clave, valor) VALUES (?, ?)')
   for (const [clave, valor] of configDefaults) insertConf.run(clave, valor)
+
+  // Admin por defecto — password: admin (SHA-256)
+  db.prepare(`
+    INSERT OR IGNORE INTO usuarios (nombre, usuario, password_hash, rol)
+    VALUES ('Administrador', 'admin', '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', 'admin')
+  `).run()
+
+  // Listas de precios (10 slots)
+  const insertLista = db.prepare('INSERT OR IGNORE INTO listas_precios (nombre, tipo, activa, orden) VALUES (?, ?, ?, ?)')
+  const listasDefault = [
+    ['Minorista', 'minorista', 1, 1],
+    ['Mayorista', 'mayorista', 1, 2],
+    ['Lista 3',   'custom', 0, 3], ['Lista 4',  'custom', 0, 4],
+    ['Lista 5',   'custom', 0, 5], ['Lista 6',  'custom', 0, 6],
+    ['Lista 7',   'custom', 0, 7], ['Lista 8',  'custom', 0, 8],
+    ['Lista 9',   'custom', 0, 9], ['Lista 10', 'custom', 0, 10],
+  ]
+  for (const l of listasDefault) insertLista.run(...l)
+
+  // Tarjetas
+  const insertTarjeta = db.prepare('INSERT OR IGNORE INTO tarjetas (nombre, tipo, activa) VALUES (?, ?, ?)')
+  const tarjetasDefault = [
+    ['Visa Crédito',        'credito', 1], ['Mastercard',           'credito', 1],
+    ['Cabal',               'credito', 1], ['Naranja',              'credito', 1],
+    ['American Express',    'credito', 0], ['Naranja X',            'credito', 0],
+    ['Diners Club',         'credito', 0], ['Visa Débito',          'debito',  1],
+    ['Mastercard Débito',   'debito',  1], ['Cabal Débito',         'debito',  0],
+    ['Maestro',             'debito',  0],
+  ]
+  for (const t of tarjetasDefault) insertTarjeta.run(...t)
 }

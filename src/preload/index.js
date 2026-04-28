@@ -3,6 +3,10 @@ import { contextBridge, ipcRenderer } from 'electron'
 const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args)
 
 contextBridge.exposeInMainWorld('api', {
+  auth: {
+    login: (datos) => invoke('auth:login', datos)
+  },
+
   productos: {
     listar: (filtros) => invoke('productos:listar', filtros),
     buscarCodigo: (codigo) => invoke('productos:buscar-codigo', codigo),
@@ -45,6 +49,28 @@ contextBridge.exposeInMainWorld('api', {
   config: {
     get: (clave) => invoke('configuracion:get', clave),
     getAll: () => invoke('configuracion:getAll'),
-    set: (clave, valor) => invoke('configuracion:set', { clave, valor })
+    set: (clave, valor) => invoke('configuracion:set', { clave, valor }),
+    setMany: (datos) => invoke('configuracion:set-many', datos),
+    uploadLogo: () => invoke('configuracion:upload-logo')
+  },
+
+  usuarios: {
+    listar: () => invoke('usuarios:listar'),
+    crear: (datos) => invoke('usuarios:crear', datos),
+    actualizar: (datos) => invoke('usuarios:actualizar', datos),
+    eliminar: (id) => invoke('usuarios:eliminar', id),
+    cambiarPassword: (datos) => invoke('usuarios:cambiar-password', datos),
+    toggleActivo: (id) => invoke('usuarios:toggle-activo', id)
+  },
+
+  listasPrecio: {
+    listar: () => invoke('listas-precios:listar'),
+    actualizar: (datos) => invoke('listas-precios:actualizar', datos),
+    guardarTodas: (listas) => invoke('listas-precios:guardar-todas', listas)
+  },
+
+  tarjetas: {
+    listar: () => invoke('tarjetas:listar'),
+    toggle: (id) => invoke('tarjetas:toggle', id)
   }
 })

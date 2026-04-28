@@ -6,26 +6,24 @@ export default function Login({ onLogin }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     setLoading(true)
-
-    setTimeout(() => {
-      if (usuario === 'Administrador' && password === 'admin') {
-        onLogin({ nombre: usuario })
-      } else {
-        setError('Usuario o contraseña incorrectos.')
-        setLoading(false)
-      }
-    }, 400)
+    try {
+      const user = await window.api.auth.login({ usuario, password })
+      onLogin(user)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <div className="flex h-screen w-screen items-center justify-center bg-slate-900">
       <div className="w-full max-w-sm px-4">
 
-        {/* Brand */}
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-600 shadow-lg">
             <svg className="h-9 w-9 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -36,10 +34,8 @@ export default function Login({ onLogin }) {
           <p className="mt-1 text-sm text-slate-400">Sistema de punto de venta</p>
         </div>
 
-        {/* Card */}
         <div className="rounded-2xl border border-slate-700 bg-slate-800 p-8 shadow-2xl">
           <h2 className="mb-6 text-base font-semibold text-slate-200">Iniciar sesión</h2>
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-slate-400">
@@ -48,14 +44,13 @@ export default function Login({ onLogin }) {
               <input
                 type="text"
                 value={usuario}
-                onChange={(e) => setUsuario(e.target.value)}
+                onChange={e => setUsuario(e.target.value)}
                 placeholder="Ingresá tu usuario"
                 autoFocus
                 autoComplete="username"
                 className="w-full rounded-lg border border-slate-600 bg-slate-900 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
               />
             </div>
-
             <div>
               <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-slate-400">
                 Contraseña
@@ -63,13 +58,12 @@ export default function Login({ onLogin }) {
               <input
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
                 autoComplete="current-password"
                 className="w-full rounded-lg border border-slate-600 bg-slate-900 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
               />
             </div>
-
             {error && (
               <div className="flex items-center gap-2 rounded-lg border border-red-800 bg-red-950 px-3 py-2.5 text-sm text-red-400">
                 <svg className="h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -78,7 +72,6 @@ export default function Login({ onLogin }) {
                 {error}
               </div>
             )}
-
             <button
               type="submit"
               disabled={loading || !usuario || !password}

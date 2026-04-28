@@ -6,6 +6,8 @@ import { registerProductosHandlers } from './ipc/productos'
 import { registerVentasHandlers } from './ipc/ventas'
 import { registerCajaHandlers } from './ipc/caja'
 import { registerImportarHandlers } from './ipc/importar'
+import { registerAuthHandlers } from './ipc/auth'
+import { registerConfiguracionHandlers } from './ipc/configuracion'
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -46,6 +48,8 @@ app.whenReady().then(() => {
   registerVentasHandlers(ipcMain, db)
   registerCajaHandlers(ipcMain, db)
   registerImportarHandlers(ipcMain, db)
+  registerAuthHandlers(ipcMain, db)
+  registerConfiguracionHandlers(ipcMain, db)
 
   createWindow()
 
