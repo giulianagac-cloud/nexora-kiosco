@@ -183,9 +183,10 @@ function seedInitialData(db) {
   const insertConf = db.prepare('INSERT OR IGNORE INTO configuracion (clave, valor) VALUES (?, ?)')
   for (const [clave, valor] of configDefaults) insertConf.run(clave, valor)
 
-  // Migración: renombrar usuario 'admin' → 'Administrador' en bases existentes
+  // Limpia el usuario semilla viejo (usuario='admin') si quedó en la base.
+  // Cubre el caso en que coexistan 'admin' y 'Administrador' por migraciones fallidas.
   db.prepare(`
-    UPDATE usuarios SET usuario = 'Administrador'
+    DELETE FROM usuarios
     WHERE usuario = 'admin' AND nombre = 'Administrador' AND rol = 'admin'
   `).run()
 
