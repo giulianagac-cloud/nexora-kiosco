@@ -96,18 +96,4 @@ export function registerCajaHandlers(ipcMain, db) {
       .all(limite)
   })
 
-  ipcMain.handle('configuracion:get', (_, clave) => {
-    const row = db.prepare('SELECT valor FROM configuracion WHERE clave = ?').get(clave)
-    return row?.valor ?? null
-  })
-
-  ipcMain.handle('configuracion:getAll', () => {
-    const rows = db.prepare('SELECT clave, valor FROM configuracion').all()
-    return Object.fromEntries(rows.map((r) => [r.clave, r.valor]))
-  })
-
-  ipcMain.handle('configuracion:set', (_, { clave, valor }) => {
-    db.prepare('INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?, ?)').run(clave, String(valor))
-    return { ok: true }
-  })
 }
