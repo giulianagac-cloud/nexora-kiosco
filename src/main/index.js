@@ -8,6 +8,7 @@ import { registerCajaHandlers } from './ipc/caja'
 import { registerImportarHandlers } from './ipc/importar'
 import { registerAuthHandlers } from './ipc/auth'
 import { registerConfiguracionHandlers } from './ipc/configuracion'
+import { registerClientesHandlers } from './ipc/clientes'
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -50,6 +51,7 @@ app.whenReady().then(() => {
   registerImportarHandlers(ipcMain, db)
   registerAuthHandlers(ipcMain, db)
   registerConfiguracionHandlers(ipcMain, db)
+  registerClientesHandlers(ipcMain, db)
 
   createWindow()
 

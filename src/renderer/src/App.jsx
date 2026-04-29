@@ -6,6 +6,7 @@ import Articulos from '@/pages/Articulos'
 import Historial from '@/pages/Historial'
 import Caja from '@/pages/Caja'
 import Configuracion from '@/pages/Configuracion'
+import Clientes from '@/pages/Clientes'
 import Login from '@/pages/Login'
 
 export default function App() {
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/historial" element={<Historial />} />
           <Route path="/caja" element={<Caja />} />
           <Route path="/configuracion" element={<Configuracion />} />
+          <Route path="/clientes" element={<Clientes />} />
         </Routes>
       </main>
     </div>

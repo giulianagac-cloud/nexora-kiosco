@@ -72,5 +72,15 @@ contextBridge.exposeInMainWorld('api', {
   tarjetas: {
     listar: () => invoke('tarjetas:listar'),
     toggle: (id) => invoke('tarjetas:toggle', id)
+  },
+
+  clientes: {
+    listar:            (filtros) => invoke('clientes:listar', filtros),
+    get:               (id)      => invoke('clientes:get', id),
+    crear:             (datos)   => invoke('clientes:crear', datos),
+    actualizar:        (datos)   => invoke('clientes:actualizar', datos),
+    eliminar:          (id)      => invoke('clientes:eliminar', id),
+    movimientos:       (id)      => invoke('clientes:movimientos', id),
+    agregarMovimiento: (datos)   => invoke('clientes:agregar-movimiento', datos),
   }
 })

@@ -99,6 +99,38 @@ export function createSchema(db) {
       tipo    TEXT NOT NULL CHECK(tipo IN ('credito','debito')),
       activa  INTEGER NOT NULL DEFAULT 1
     );
+
+    CREATE TABLE IF NOT EXISTS clientes (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      tipo_cuenta     TEXT NOT NULL DEFAULT 'individuo' CHECK(tipo_cuenta IN ('individuo','empresa')),
+      nombre          TEXT NOT NULL,
+      apellido        TEXT,
+      tipo_documento  TEXT NOT NULL DEFAULT 'DNI' CHECK(tipo_documento IN ('DNI','CUIT','CUIL','Pasaporte')),
+      nro_documento   TEXT,
+      telefono        TEXT,
+      email           TEXT,
+      calle           TEXT,
+      numero          TEXT,
+      localidad       TEXT,
+      provincia       TEXT,
+      condicion_iva   TEXT NOT NULL DEFAULT 'consumidor_final' CHECK(condicion_iva IN ('consumidor_final','monotributo','responsable_inscripto')),
+      observaciones   TEXT,
+      cc_habilitada   INTEGER NOT NULL DEFAULT 0,
+      cc_tipo         TEXT NOT NULL DEFAULT 'ilimitada' CHECK(cc_tipo IN ('ilimitada','limitada')),
+      cc_limite       REAL NOT NULL DEFAULT 0,
+      cc_saldo        REAL NOT NULL DEFAULT 0,
+      activo          INTEGER NOT NULL DEFAULT 1,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS movimientos_cuenta_corriente (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      cliente_id  INTEGER NOT NULL REFERENCES clientes(id),
+      tipo        TEXT NOT NULL CHECK(tipo IN ('debito','credito')),
+      monto       REAL NOT NULL,
+      descripcion TEXT,
+      fecha       TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
   `)
 
   migrateVentas(db)
