@@ -183,10 +183,16 @@ function seedInitialData(db) {
   const insertConf = db.prepare('INSERT OR IGNORE INTO configuracion (clave, valor) VALUES (?, ?)')
   for (const [clave, valor] of configDefaults) insertConf.run(clave, valor)
 
-  // Admin por defecto — password: admin (SHA-256)
+  // Admin por defecto — usuario: Administrador, password: admin (SHA-256)
   db.prepare(`
     INSERT OR IGNORE INTO usuarios (nombre, usuario, password_hash, rol)
-    VALUES ('Administrador', 'admin', '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', 'admin')
+    VALUES ('Administrador', 'Administrador', '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', 'admin')
+  `).run()
+
+  // Migración: renombrar usuario 'admin' → 'Administrador' en bases existentes
+  db.prepare(`
+    UPDATE usuarios SET usuario = 'Administrador'
+    WHERE usuario = 'admin' AND nombre = 'Administrador' AND rol = 'admin'
   `).run()
 
   // Listas de precios (10 slots)
