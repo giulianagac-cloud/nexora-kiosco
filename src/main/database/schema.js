@@ -80,7 +80,7 @@ export function createSchema(db) {
       nombre        TEXT NOT NULL,
       usuario       TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
-      rol           TEXT NOT NULL DEFAULT 'operador' CHECK(rol IN ('admin','operador')),
+      rol           TEXT NOT NULL DEFAULT 'cajero' CHECK(rol IN ('admin','cajero')),
       activo        INTEGER NOT NULL DEFAULT 1,
       created_at    TEXT NOT NULL DEFAULT (datetime('now','localtime'))
     );
@@ -131,11 +131,74 @@ export function createSchema(db) {
       descripcion TEXT,
       fecha       TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
+
+    CREATE TABLE IF NOT EXISTS proveedores (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      razon_social      TEXT NOT NULL,
+      nombre_comercial  TEXT,
+      cuit              TEXT,
+      telefono          TEXT,
+      celular           TEXT,
+      email             TEXT,
+      calle             TEXT,
+      numero            TEXT,
+      localidad         TEXT,
+      contacto          TEXT,
+      ingresos_brutos   TEXT,
+      condicion_iva     TEXT NOT NULL DEFAULT 'monotributo',
+      web               TEXT,
+      observaciones     TEXT,
+      saldo             REAL NOT NULL DEFAULT 0,
+      activo            INTEGER NOT NULL DEFAULT 1,
+      created_at        TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS movimientos_proveedores (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      proveedor_id   INTEGER NOT NULL REFERENCES proveedores(id),
+      tipo           TEXT NOT NULL CHECK(tipo IN ('credito','debito')),
+      monto          REAL NOT NULL,
+      descripcion    TEXT,
+      fecha          TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
   `)
 
   migrateVentas(db)
   migrateProductos(db)
+  migrateUsuarios(db)
   seedInitialData(db)
+}
+
+function migrateUsuarios(db) {
+  const info = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='usuarios'").get()
+  if (!info || info.sql.includes("'cajero'")) return
+  db.exec('BEGIN TRANSACTION')
+  try {
+    db.exec(`
+      CREATE TABLE usuarios_new (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre        TEXT NOT NULL,
+        usuario       TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        rol           TEXT NOT NULL DEFAULT 'cajero' CHECK(rol IN ('admin','cajero')),
+        activo        INTEGER NOT NULL DEFAULT 1,
+        created_at    TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+      );
+    `)
+    db.exec(`
+      INSERT INTO usuarios_new (id, nombre, usuario, password_hash, rol, activo, created_at)
+      SELECT id, nombre, usuario, password_hash,
+             CASE WHEN rol = 'operador' THEN 'cajero' ELSE rol END,
+             activo, created_at
+      FROM usuarios;
+    `)
+    db.exec('DROP TABLE usuarios;')
+    db.exec('ALTER TABLE usuarios_new RENAME TO usuarios;')
+    db.exec('COMMIT')
+  } catch (e) {
+    db.exec('ROLLBACK')
+    throw e
+  }
 }
 
 function migrateVentas(db) {

@@ -82,5 +82,29 @@ contextBridge.exposeInMainWorld('api', {
     eliminar:          (id)      => invoke('clientes:eliminar', id),
     movimientos:       (id)      => invoke('clientes:movimientos', id),
     agregarMovimiento: (datos)   => invoke('clientes:agregar-movimiento', datos),
-  }
+  },
+
+  proveedores: {
+    listar:            (filtros) => invoke('proveedores:listar', filtros),
+    get:               (id)      => invoke('proveedores:get', id),
+    crear:             (datos)   => invoke('proveedores:crear', datos),
+    actualizar:        (datos)   => invoke('proveedores:actualizar', datos),
+    eliminar:          (id)      => invoke('proveedores:eliminar', id),
+    movimientos:       (id)      => invoke('proveedores:movimientos', id),
+    agregarMovimiento: (datos)   => invoke('proveedores:agregar-movimiento', datos),
+  },
+
+  listados: {
+    listaPrecios:    (tipo) => invoke('listados:lista-precios', tipo),
+    reposicion:      ()     => invoke('listados:reposicion'),
+    stockValorizado: ()     => invoke('listados:stock-valorizado'),
+  },
+
+  informes: {
+    ventasFecha:      (params) => invoke('informes:ventas-fecha', params),
+    ventasDetalle:    (params) => invoke('informes:ventas-detalle', params),
+    ventasRubros:     (params) => invoke('informes:ventas-rubros', params),
+    ventasArticulos:  (params) => invoke('informes:ventas-articulos', params),
+    ventasMediosPago: (params) => invoke('informes:ventas-medios-pago', params),
+  },
 })

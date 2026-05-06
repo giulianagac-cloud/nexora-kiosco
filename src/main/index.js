@@ -9,6 +9,9 @@ import { registerImportarHandlers } from './ipc/importar'
 import { registerAuthHandlers } from './ipc/auth'
 import { registerConfiguracionHandlers } from './ipc/configuracion'
 import { registerClientesHandlers } from './ipc/clientes'
+import { registerProveedoresHandlers } from './ipc/proveedores'
+import { registerListadosHandlers } from './ipc/listados'
+import { registerInformesHandlers } from './ipc/informes'
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -52,6 +55,9 @@ app.whenReady().then(() => {
   registerAuthHandlers(ipcMain, db)
   registerConfiguracionHandlers(ipcMain, db)
   registerClientesHandlers(ipcMain, db)
+  registerProveedoresHandlers(ipcMain, db)
+  registerListadosHandlers(ipcMain, db)
+  registerInformesHandlers(ipcMain, db)
 
   createWindow()
 

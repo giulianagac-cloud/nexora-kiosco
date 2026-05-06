@@ -7,7 +7,15 @@ import Historial from '@/pages/Historial'
 import Caja from '@/pages/Caja'
 import Configuracion from '@/pages/Configuracion'
 import Clientes from '@/pages/Clientes'
+import Proveedores from '@/pages/Proveedores'
+import Listados from '@/pages/Listados'
+import Informes from '@/pages/Informes'
 import Login from '@/pages/Login'
+
+function RequireAdmin({ usuario, children }) {
+  if (usuario?.rol !== 'admin') return <Navigate to="/venta" replace />
+  return children
+}
 
 export default function App() {
   const [usuario, setUsuario] = useState(null)
@@ -23,11 +31,14 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/venta" replace />} />
           <Route path="/venta" element={<Venta />} />
-          <Route path="/articulos" element={<Articulos />} />
-          <Route path="/historial" element={<Historial />} />
           <Route path="/caja" element={<Caja />} />
-          <Route path="/configuracion" element={<Configuracion />} />
-          <Route path="/clientes" element={<Clientes />} />
+          <Route path="/articulos" element={<RequireAdmin usuario={usuario}><Articulos /></RequireAdmin>} />
+          <Route path="/historial" element={<RequireAdmin usuario={usuario}><Historial /></RequireAdmin>} />
+          <Route path="/clientes" element={<RequireAdmin usuario={usuario}><Clientes /></RequireAdmin>} />
+          <Route path="/proveedores" element={<RequireAdmin usuario={usuario}><Proveedores /></RequireAdmin>} />
+          <Route path="/listados" element={<RequireAdmin usuario={usuario}><Listados /></RequireAdmin>} />
+          <Route path="/informes" element={<RequireAdmin usuario={usuario}><Informes /></RequireAdmin>} />
+          <Route path="/configuracion" element={<RequireAdmin usuario={usuario}><Configuracion /></RequireAdmin>} />
         </Routes>
       </main>
     </div>

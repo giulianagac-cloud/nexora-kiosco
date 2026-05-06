@@ -55,7 +55,7 @@ export function registerConfiguracionHandlers(ipcMain, db) {
       throw new Error('Nombre, usuario y contraseña son obligatorios')
     const result = db.prepare(
       'INSERT INTO usuarios (nombre, usuario, password_hash, rol) VALUES (?, ?, ?, ?)'
-    ).run(nombre.trim(), usuario.trim(), sha256(password), rol ?? 'operador')
+    ).run(nombre.trim(), usuario.trim(), sha256(password), rol ?? 'cajero')
     return { id: result.lastInsertRowid }
   })
 
