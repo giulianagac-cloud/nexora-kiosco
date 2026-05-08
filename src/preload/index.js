@@ -44,9 +44,14 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   importar: {
-    excel:         ()       => invoke('importar:excel'),
-    inspeccionarDb: ()      => invoke('importar:inspeccionar-db'),
-    desdeDb:       (params) => invoke('importar:desde-db', params),
+    excel:          ()       => invoke('importar:excel'),
+    inspeccionarDb: ()       => invoke('importar:inspeccionar-db'),
+    desdeDb:        (params) => invoke('importar:desde-db', params),
+    onProgreso:     (cb)     => {
+      ipcRenderer.removeAllListeners('importar:progreso')
+      ipcRenderer.on('importar:progreso', (_, data) => cb(data))
+    },
+    offProgreso: () => ipcRenderer.removeAllListeners('importar:progreso'),
   },
 
   config: {

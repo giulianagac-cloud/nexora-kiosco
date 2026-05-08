@@ -88,10 +88,11 @@ export default function Articulos() {
   const [resultImport, setResultImport] = useState(null)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const checkAllRef = useRef(null)
-  const [modalDb, setModalDb]         = useState(null)
-  const [dbTabla, setDbTabla]         = useState('')
-  const [dbMapeo, setDbMapeo]         = useState({})
+  const [modalDb, setModalDb]           = useState(null)
+  const [dbTabla, setDbTabla]           = useState('')
+  const [dbMapeo, setDbMapeo]           = useState({})
   const [importandoDb, setImportandoDb] = useState(false)
+  const [dbProgreso, setDbProgreso]     = useState(null)
 
   useEffect(() => { cargarDatos() }, [])
 
@@ -252,14 +253,18 @@ export default function Articulos() {
   }
 
   async function abrirImportDb() {
-    const resultado = await window.api.importar.inspeccionarDb()
-    if (!resultado) return
-    const { filePath, tablas } = resultado
-    const PRIORIDAD = ['productos', 'articulos', 'items', 'stock', 'inventario']
-    const tablaAuto = tablas.find(t => PRIORIDAD.includes(t.nombre.toLowerCase()))?.nombre ?? tablas[0]?.nombre ?? ''
-    setModalDb({ filePath, tablas })
-    setDbTabla(tablaAuto)
-    setDbMapeo(tablaAuto ? autoMapear(tablas.find(t => t.nombre === tablaAuto)?.columnas ?? []) : {})
+    try {
+      const resultado = await window.api.importar.inspeccionarDb()
+      if (!resultado) return
+      const { filePath, tablas } = resultado
+      const PRIORIDAD = ['productos', 'articulos', 'items', 'stock', 'inventario']
+      const tablaAuto = tablas.find(t => PRIORIDAD.includes(t.nombre.toLowerCase()))?.nombre ?? tablas[0]?.nombre ?? ''
+      setModalDb({ filePath, tablas })
+      setDbTabla(tablaAuto)
+      setDbMapeo(tablaAuto ? autoMapear(tablas.find(t => t.nombre === tablaAuto)?.columnas ?? []) : {})
+    } catch (e) {
+      setResultImport({ error: e.message })
+    }
   }
 
   function onDbTablaChange(nombre) {
@@ -270,6 +275,8 @@ export default function Articulos() {
   async function ejecutarImportDb() {
     if (!dbMapeo.descripcion || !dbTabla) return
     setImportandoDb(true)
+    setDbProgreso({ done: 0, total: modalDb.tablas.find(t => t.nombre === dbTabla)?.total ?? 0 })
+    window.api.importar.onProgreso(data => setDbProgreso(data))
     try {
       const resultado = await window.api.importar.desdeDb({ filePath: modalDb.filePath, tabla: dbTabla, mapeo: dbMapeo })
       setResultImport(resultado)
@@ -279,7 +286,9 @@ export default function Articulos() {
       setResultImport({ error: e.message })
       setModalDb(null)
     } finally {
+      window.api.importar.offProgreso()
       setImportandoDb(false)
+      setDbProgreso(null)
     }
   }
 
@@ -632,12 +641,24 @@ export default function Articulos() {
                 className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-900/30"
               >
                 {importandoDb ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                    </svg>
-                    Importando...
+                  <span className="flex flex-col items-center gap-1 w-full">
+                    <span className="flex items-center gap-2 text-sm">
+                      <svg className="w-4 h-4 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      {dbProgreso
+                        ? `${dbProgreso.done.toLocaleString('es-AR')} / ${dbProgreso.total.toLocaleString('es-AR')} registros`
+                        : 'Preparando...'}
+                    </span>
+                    {dbProgreso?.total > 0 && (
+                      <div className="w-full bg-emerald-900/40 rounded-full h-1">
+                        <div
+                          className="bg-emerald-400 h-1 rounded-full transition-all duration-300"
+                          style={{ width: `${Math.round(dbProgreso.done / dbProgreso.total * 100)}%` }}
+                        />
+                      </div>
+                    )}
                   </span>
                 ) : (
                   `Importar ${(modalDb.tablas.find(t => t.nombre === dbTabla)?.total ?? 0).toLocaleString('es-AR')} registros`

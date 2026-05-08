@@ -4,10 +4,8 @@ import Database from 'better-sqlite3'
 
 export function registerImportarHandlers(ipcMain, db) {
 
-  // ── Lógica compartida de inserción masiva ──────────────────────────────────
-  // filas: [{ nombre, codigo, rubroRaw, precio_costo, iva, utilidad_minorista,
-  //           precio, stock, stock_minimo, stock_maximo }]
-  function importarProductos(filas) {
+  // ── Contexto compartido: Maps + statements preparados ─────────────────────
+  function _crearContexto() {
     db.pragma('cache_size = -65536')
     db.pragma('temp_store = MEMORY')
 
@@ -57,60 +55,57 @@ export function registerImportarHandlers(ipcMain, db) {
       `)
     }
 
-    let insertados = 0, actualizados = 0, omitidos = 0
-    const errores = []
+    return { catMap, byCode, byNombre, stmts, insertados: 0, actualizados: 0, omitidos: 0, errores: [] }
+  }
 
-    db.transaction(() => {
-      filas.forEach(({ nombre, codigo, rubroRaw, precio_costo, iva, utilidad_minorista, precio, stock, stock_minimo, stock_maximo }, i) => {
-        if (!nombre) { omitidos++; return }
+  // ── Procesar una fila dentro de un contexto activo ─────────────────────────
+  function _procesarFila(ctx, fila, rowIdx) {
+    const { nombre, codigo, rubroRaw, precio_costo, iva, utilidad_minorista, precio, stock, stock_minimo, stock_maximo } = fila
+    if (!nombre) { ctx.omitidos++; return }
 
-        let categoria_id = null
-        if (rubroRaw) {
-          const key = rubroRaw.toLowerCase()
-          if (catMap.has(key)) {
-            categoria_id = catMap.get(key)
-          } else {
-            stmts.insertCat.run(rubroRaw)
-            const cat = stmts.getCat.get(rubroRaw)
-            if (cat) { catMap.set(key, cat.id); categoria_id = cat.id }
-          }
-        }
+    let categoria_id = null
+    if (rubroRaw) {
+      const key = rubroRaw.toLowerCase()
+      if (ctx.catMap.has(key)) {
+        categoria_id = ctx.catMap.get(key)
+      } else {
+        ctx.stmts.insertCat.run(rubroRaw)
+        const cat = ctx.stmts.getCat.get(rubroRaw)
+        if (cat) { ctx.catMap.set(key, cat.id); categoria_id = cat.id }
+      }
+    }
 
-        const datos = {
-          nombre,
-          codigo_barras:      codigo || null,
-          categoria_id,
-          precio_costo:       precio_costo       || 0,
-          iva:                iva                || 21,
-          utilidad_minorista: utilidad_minorista || 0,
-          precio:             precio             || 0,
-          utilidad_mayorista: 0,
-          precio_mayorista:   0,
-          stock:              stock        || 0,
-          stock_minimo:       stock_minimo || 0,
-          stock_maximo:       stock_maximo || 0,
-        }
+    const datos = {
+      nombre,
+      codigo_barras:      codigo || null,
+      categoria_id,
+      precio_costo:       precio_costo       || 0,
+      iva:                iva                || 21,
+      utilidad_minorista: utilidad_minorista || 0,
+      precio:             precio             || 0,
+      utilidad_mayorista: 0,
+      precio_mayorista:   0,
+      stock:              stock        || 0,
+      stock_minimo:       stock_minimo || 0,
+      stock_maximo:       stock_maximo || 0,
+    }
 
-        try {
-          const existenteId = (codigo ? byCode.get(codigo) : undefined) ?? byNombre.get(nombre)
-          if (existenteId !== undefined) {
-            stmts.update.run({ ...datos, id: existenteId })
-            actualizados++
-            if (codigo) byCode.set(codigo, existenteId)
-            byNombre.set(nombre, existenteId)
-          } else {
-            const result = stmts.insert.run(datos)
-            insertados++
-            if (codigo) byCode.set(codigo, result.lastInsertRowid)
-            byNombre.set(nombre, result.lastInsertRowid)
-          }
-        } catch (e) {
-          errores.push({ fila: i + 2, motivo: e.message })
-        }
-      })
-    })()
-
-    return { insertados, actualizados, omitidos, errores }
+    try {
+      const existenteId = (codigo ? ctx.byCode.get(codigo) : undefined) ?? ctx.byNombre.get(nombre)
+      if (existenteId !== undefined) {
+        ctx.stmts.update.run({ ...datos, id: existenteId })
+        ctx.actualizados++
+        if (codigo) ctx.byCode.set(codigo, existenteId)
+        ctx.byNombre.set(nombre, existenteId)
+      } else {
+        const result = ctx.stmts.insert.run(datos)
+        ctx.insertados++
+        if (codigo) ctx.byCode.set(codigo, result.lastInsertRowid)
+        ctx.byNombre.set(nombre, result.lastInsertRowid)
+      }
+    } catch (e) {
+      ctx.errores.push({ fila: rowIdx + 2, motivo: e.message })
+    }
   }
 
   // ── Handler: Importar Excel ────────────────────────────────────────────────
@@ -151,7 +146,9 @@ export function registerImportarHandlers(ipcMain, db) {
       }
     })
 
-    return importarProductos(filas)
+    const ctx = _crearContexto()
+    db.transaction(() => filas.forEach((f, i) => _procesarFila(ctx, f, i)))()
+    return { insertados: ctx.insertados, actualizados: ctx.actualizados, omitidos: ctx.omitidos, errores: ctx.errores }
   })
 
   // ── Handler: Inspeccionar DB externa ──────────────────────────────────────
@@ -186,35 +183,57 @@ export function registerImportarHandlers(ipcMain, db) {
     }
   })
 
-  // ── Handler: Importar desde DB externa ────────────────────────────────────
-  ipcMain.handle('importar:desde-db', (_, { filePath, tabla, mapeo }) => {
+  // ── Handler: Importar desde DB externa (chunked — no bloquea la UI) ───────
+  ipcMain.handle('importar:desde-db', async (event, { filePath, tabla, mapeo }) => {
+    const CHUNK = 10000
     let extDb
     try {
       extDb = new Database(filePath, { readonly: true })
-      const rawRows = extDb.prepare(`SELECT * FROM "${tabla}"`).all()
-      if (!rawRows.length) return { insertados: 0, actualizados: 0, omitidos: 0, errores: [] }
+      const total = extDb.prepare(`SELECT COUNT(*) as n FROM "${tabla}"`).get()?.n ?? 0
+      if (!total) return { insertados: 0, actualizados: 0, omitidos: 0, errores: [] }
 
-      const filas = rawRows.map(row => {
-        const precio_costo = mapeo.precio_costo ? parseFloat(row[mapeo.precio_costo]) || 0  : 0
-        const iva          = mapeo.iva          ? parseFloat(row[mapeo.iva])          || 21 : 21
-        const precioVenta  = mapeo.precio_venta ? parseFloat(row[mapeo.precio_venta]) || 0  : 0
-        return {
-          nombre:             String(row[mapeo.descripcion] ?? '').trim(),
-          codigo:             mapeo.codigo     ? String(row[mapeo.codigo] ?? '').trim()  || null : null,
-          rubroRaw:           mapeo.rubro      ? String(row[mapeo.rubro] ?? '').trim()   || null : null,
+      const ctx = _crearContexto()
+      let chunk = []
+      let rowIdx = 0
+
+      for (const rawRow of extDb.prepare(`SELECT * FROM "${tabla}"`).iterate()) {
+        const precio_costo = mapeo.precio_costo ? parseFloat(rawRow[mapeo.precio_costo]) || 0  : 0
+        const iva          = mapeo.iva          ? parseFloat(rawRow[mapeo.iva])          || 21 : 21
+        const precioVenta  = mapeo.precio_venta ? parseFloat(rawRow[mapeo.precio_venta]) || 0  : 0
+        chunk.push({
+          nombre:             String(rawRow[mapeo.descripcion] ?? '').trim(),
+          codigo:             mapeo.codigo     ? String(rawRow[mapeo.codigo] ?? '').trim()  || null : null,
+          rubroRaw:           mapeo.rubro      ? String(rawRow[mapeo.rubro] ?? '').trim()   || null : null,
           precio_costo,
           iva,
           utilidad_minorista: 0,
           precio: precioVenta > 0
             ? precioVenta
             : +(precio_costo * (1 + iva / 100)).toFixed(2),
-          stock:        mapeo.stock        ? parseInt(row[mapeo.stock])        || 0 : 0,
-          stock_minimo: mapeo.stock_minimo ? parseInt(row[mapeo.stock_minimo]) || 0 : 0,
-          stock_maximo: mapeo.stock_maximo ? parseInt(row[mapeo.stock_maximo]) || 0 : 0,
-        }
-      })
+          stock:        mapeo.stock        ? parseInt(rawRow[mapeo.stock])        || 0 : 0,
+          stock_minimo: mapeo.stock_minimo ? parseInt(rawRow[mapeo.stock_minimo]) || 0 : 0,
+          stock_maximo: mapeo.stock_maximo ? parseInt(rawRow[mapeo.stock_maximo]) || 0 : 0,
+        })
+        rowIdx++
 
-      return importarProductos(filas)
+        if (chunk.length >= CHUNK) {
+          const offset = rowIdx - CHUNK
+          db.transaction(() => chunk.forEach((f, i) => _procesarFila(ctx, f, offset + i)))()
+          if (!event.sender.isDestroyed()) {
+            event.sender.send('importar:progreso', { done: rowIdx, total })
+          }
+          chunk = []
+          await new Promise(r => setImmediate(r)) // libera el event loop entre chunks
+        }
+      }
+
+      // Último chunk (resto que no llegó a CHUNK)
+      if (chunk.length > 0) {
+        const offset = rowIdx - chunk.length
+        db.transaction(() => chunk.forEach((f, i) => _procesarFila(ctx, f, offset + i)))()
+      }
+
+      return { insertados: ctx.insertados, actualizados: ctx.actualizados, omitidos: ctx.omitidos, errores: ctx.errores }
     } finally {
       extDb?.close()
     }
