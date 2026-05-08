@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const fmt = (n) =>
@@ -51,6 +51,8 @@ export default function Articulos() {
   const [error, setError] = useState('')
   const [importando, setImportando] = useState(false)
   const [resultImport, setResultImport] = useState(null)
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const checkAllRef = useRef(null)
 
   useEffect(() => { cargarDatos() }, [])
 
@@ -70,6 +72,13 @@ export default function Articulos() {
   })
 
   const selectedItem = productos.find((p) => p.id === selectedId) ?? null
+
+  const allChecked = productosFiltrados.length > 0 && productosFiltrados.every((p) => selectedIds.has(p.id))
+  const someChecked = productosFiltrados.some((p) => selectedIds.has(p.id))
+
+  useEffect(() => {
+    if (checkAllRef.current) checkAllRef.current.indeterminate = someChecked && !allChecked
+  }, [someChecked, allChecked])
 
   // ── form field updater with price recalc ───────────────────────────────────
   function setField(name, value) {
@@ -95,6 +104,33 @@ export default function Articulos() {
       }
       return next
     })
+  }
+
+  // ── multi-select ───────────────────────────────────────────────────────────
+  function toggleCheck(id, e) {
+    e.stopPropagation()
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (allChecked) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(productosFiltrados.map((p) => p.id)))
+    }
+  }
+
+  async function eliminarSeleccionados() {
+    const n = selectedIds.size
+    if (!n) return
+    if (!confirm(`¿Eliminar ${n} artículo${n !== 1 ? 's' : ''}?\nEsta acción no se puede deshacer.`)) return
+    await window.api.productos.eliminarLote([...selectedIds])
+    setSelectedIds(new Set())
+    await cargarDatos()
   }
 
   // ── actions ────────────────────────────────────────────────────────────────
@@ -250,6 +286,17 @@ export default function Articulos() {
             </svg>
             {selectedItem?.estado === 'discontinuado' ? 'Reactivar' : 'Discontinuar'}
           </button>
+          {selectedIds.size > 0 && (
+            <button
+              onClick={eliminarSeleccionados}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-400 text-sm font-medium transition"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Eliminar seleccionados ({selectedIds.size})
+            </button>
+          )}
           <button
             onClick={abrirCrear}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition shadow-lg shadow-emerald-900/30"
@@ -283,6 +330,15 @@ export default function Articulos() {
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-[#1e2334]">
               <tr>
+                <th className="pl-4 pr-2 py-3 w-8">
+                  <input
+                    ref={checkAllRef}
+                    type="checkbox"
+                    checked={allChecked}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded border-[#2d3348] bg-[#161b2a] accent-emerald-500 cursor-pointer"
+                  />
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-36">Código</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Descripción</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-32">Rubro</th>
@@ -306,6 +362,14 @@ export default function Articulos() {
                     onClick={() => setSelectedId(isSelected ? null : p.id)}
                     className={`cursor-pointer transition-colors ${rowBg}`}
                   >
+                    <td className="pl-4 pr-2 py-3" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(p.id)}
+                        onChange={(e) => toggleCheck(p.id, e)}
+                        className="w-4 h-4 rounded border-[#2d3348] bg-[#161b2a] accent-emerald-500 cursor-pointer"
+                      />
+                    </td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-500 tabular-nums">
                       {p.codigo_barras ?? <span className="text-slate-700">—</span>}
                     </td>

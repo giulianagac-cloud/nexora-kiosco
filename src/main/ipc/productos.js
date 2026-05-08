@@ -64,6 +64,12 @@ export function registerProductosHandlers(ipcMain, db) {
     return { ok: true }
   })
 
+  ipcMain.handle('productos:eliminar-lote', (_, ids) => {
+    const stmt = db.prepare('UPDATE productos SET activo = 0 WHERE id = ?')
+    db.transaction(() => { for (const id of ids) stmt.run(id) })()
+    return { ok: true, eliminados: ids.length }
+  })
+
   ipcMain.handle('productos:discontinuar', (_, id) => {
     db.prepare(
       `UPDATE productos SET estado = 'discontinuado', updated_at = datetime('now','localtime') WHERE id = ?`

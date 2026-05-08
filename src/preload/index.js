@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('api', {
     crear: (producto) => invoke('productos:crear', producto),
     actualizar: (producto) => invoke('productos:actualizar', producto),
     eliminar: (id) => invoke('productos:eliminar', id),
+    eliminarLote: (ids) => invoke('productos:eliminar-lote', ids),
     discontinuar: (id) => invoke('productos:discontinuar', id),
     reactivar: (id) => invoke('productos:reactivar', id),
     ajustarStock: (id, delta) => invoke('productos:ajustar-stock', { id, delta }),
