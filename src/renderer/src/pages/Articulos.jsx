@@ -19,6 +19,41 @@ const CLS_LABEL = 'block text-xs font-medium text-slate-400 mb-1.5'
 const CLS_BTN_GHOST =
   'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#2a2f42] hover:bg-[#323850] border border-[#2d3348] text-slate-200 text-sm font-medium transition disabled:opacity-40 disabled:cursor-not-allowed'
 
+// ── DB import: campos y auto-mapeo ───────────────────────────────────────────
+const CAMPOS_MAPEO = [
+  { key: 'descripcion',  label: 'Descripción',     required: true  },
+  { key: 'codigo',       label: 'Código de barras', required: false },
+  { key: 'rubro',        label: 'Rubro',            required: false },
+  { key: 'precio_costo', label: 'Precio costo',     required: false },
+  { key: 'iva',          label: 'IVA (%)',           required: false },
+  { key: 'precio_venta', label: 'Precio venta',      required: false },
+  { key: 'stock',        label: 'Stock',            required: false },
+  { key: 'stock_minimo', label: 'Stock mínimo',     required: false },
+  { key: 'stock_maximo', label: 'Stock máximo',     required: false },
+]
+
+function autoMapear(columnas) {
+  const cols = columnas.map(c => c.nombre.toLowerCase())
+  const find = (...opts) => {
+    for (const opt of opts) {
+      const idx = cols.findIndex(n => n === opt || n.includes(opt) || opt.includes(n))
+      if (idx >= 0) return columnas[idx].nombre
+    }
+    return ''
+  }
+  return {
+    descripcion:  find('descripcion', 'nombre', 'desc', 'articulo', 'producto', 'item', 'detalle'),
+    codigo:       find('codigo', 'cod', 'barcode', 'ean', 'gtin', 'barra', 'cod_barra'),
+    rubro:        find('rubro', 'categoria', 'familia', 'grupo', 'departamento', 'seccion'),
+    precio_costo: find('precio_costo', 'costo', 'compra', 'p_costo', 'preciocosto'),
+    iva:          find('iva', 'alicuota', 'tax', 'impuesto'),
+    precio_venta: find('precio_venta', 'precio', 'venta', 'pventa', 'precioventa', 'precio1', 'price'),
+    stock:        find('stock', 'cantidad', 'existencia', 'qty', 'saldo'),
+    stock_minimo: find('stock_minimo', 'minimo', 'stockmin', 'min_stock'),
+    stock_maximo: find('stock_maximo', 'maximo', 'stockmax', 'max_stock'),
+  }
+}
+
 // ── form default ──────────────────────────────────────────────────────────────
 const FORM_VACIO = {
   nombre: '',
@@ -53,6 +88,10 @@ export default function Articulos() {
   const [resultImport, setResultImport] = useState(null)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const checkAllRef = useRef(null)
+  const [modalDb, setModalDb]         = useState(null)
+  const [dbTabla, setDbTabla]         = useState('')
+  const [dbMapeo, setDbMapeo]         = useState({})
+  const [importandoDb, setImportandoDb] = useState(false)
 
   useEffect(() => { cargarDatos() }, [])
 
@@ -212,6 +251,38 @@ export default function Articulos() {
     }
   }
 
+  async function abrirImportDb() {
+    const resultado = await window.api.importar.inspeccionarDb()
+    if (!resultado) return
+    const { filePath, tablas } = resultado
+    const PRIORIDAD = ['productos', 'articulos', 'items', 'stock', 'inventario']
+    const tablaAuto = tablas.find(t => PRIORIDAD.includes(t.nombre.toLowerCase()))?.nombre ?? tablas[0]?.nombre ?? ''
+    setModalDb({ filePath, tablas })
+    setDbTabla(tablaAuto)
+    setDbMapeo(tablaAuto ? autoMapear(tablas.find(t => t.nombre === tablaAuto)?.columnas ?? []) : {})
+  }
+
+  function onDbTablaChange(nombre) {
+    setDbTabla(nombre)
+    setDbMapeo(autoMapear(modalDb?.tablas.find(t => t.nombre === nombre)?.columnas ?? []))
+  }
+
+  async function ejecutarImportDb() {
+    if (!dbMapeo.descripcion || !dbTabla) return
+    setImportandoDb(true)
+    try {
+      const resultado = await window.api.importar.desdeDb({ filePath: modalDb.filePath, tabla: dbTabla, mapeo: dbMapeo })
+      setResultImport(resultado)
+      setModalDb(null)
+      await cargarDatos()
+    } catch (e) {
+      setResultImport({ error: e.message })
+      setModalDb(null)
+    } finally {
+      setImportandoDb(false)
+    }
+  }
+
   async function importarExcel() {
     setImportando(true)
     try {
@@ -249,6 +320,13 @@ export default function Articulos() {
           <p className="text-sm text-slate-400 mt-0.5">{productos.length} artículos registrados</p>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={abrirImportDb} className={CLS_BTN_GHOST}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <ellipse cx="12" cy="5" rx="8" ry="3" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 5v5c0 1.657 3.582 3 8 3s8-1.343 8-3V5M4 10v5c0 1.657 3.582 3 8 3s8-1.343 8-3v-5" />
+            </svg>
+            Importar .db
+          </button>
           <button
             onClick={importarExcel}
             disabled={importando}
@@ -428,6 +506,147 @@ export default function Articulos() {
           )}
         </div>
       </div>
+
+      {/* ── Modal importar desde .db ── */}
+      {modalDb && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-[#2d3348] bg-[#1e2334] shadow-2xl flex flex-col" style={{ maxHeight: '90vh' }}>
+
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#2d3348] shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/15 shrink-0">
+                  <svg className="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <ellipse cx="12" cy="5" rx="8" ry="3" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 5v5c0 1.657 3.582 3 8 3s8-1.343 8-3V5M4 10v5c0 1.657 3.582 3 8 3s8-1.343 8-3v-5" />
+                  </svg>
+                </div>
+                <h2 className="font-semibold text-white">Importar base de datos</h2>
+              </div>
+              <button onClick={() => setModalDb(null)} className="text-slate-500 hover:text-slate-300 transition p-1 rounded-lg hover:bg-[#2d3348]">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-5 min-h-0 space-y-5">
+
+              <div>
+                <p className={CLS_LABEL}>Archivo seleccionado</p>
+                <div className="px-3 py-2 rounded-lg bg-[#161b2a] border border-[#2d3348] text-sm text-slate-400 font-mono truncate">
+                  {modalDb.filePath.split(/[/\\]/).pop()}
+                </div>
+              </div>
+
+              <div>
+                <label className={CLS_LABEL}>Tabla a importar</label>
+                {modalDb.tablas.length === 0 ? (
+                  <p className="text-sm text-rose-400">No se encontraron tablas en esta base de datos.</p>
+                ) : (
+                  <select value={dbTabla} onChange={(e) => onDbTablaChange(e.target.value)} className={CLS_INPUT}>
+                    {modalDb.tablas.map(t => (
+                      <option key={t.nombre} value={t.nombre}>
+                        {t.nombre} — {t.total.toLocaleString('es-AR')} registros
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {dbTabla && (
+                <div>
+                  <p className={CLS_LABEL}>Mapeo de columnas</p>
+                  <div className="rounded-xl border border-[#2d3348] overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-[#161b2a]">
+                          <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-400 w-40">Campo Nexora</th>
+                          <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-400">Columna en el archivo</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#2d3348]/50">
+                        {CAMPOS_MAPEO.map(({ key, label, required }) => {
+                          const columnas = modalDb.tablas.find(t => t.nombre === dbTabla)?.columnas ?? []
+                          return (
+                            <tr key={key} className="bg-[#1e2334]">
+                              <td className="px-4 py-2.5 text-slate-300 text-sm">
+                                {label}{required && <span className="text-rose-400 ml-1">*</span>}
+                              </td>
+                              <td className="px-4 py-2">
+                                <select
+                                  value={dbMapeo[key] || ''}
+                                  onChange={(e) => setDbMapeo(m => ({ ...m, [key]: e.target.value }))}
+                                  className="w-full bg-[#161b2a] border border-[#2d3348] rounded-lg px-2 py-1.5 text-sm text-slate-100 outline-none focus:border-emerald-500 transition"
+                                >
+                                  <option value="">{required ? '— seleccionar —' : '— no importar —'}</option>
+                                  {columnas.map(c => (
+                                    <option key={c.nombre} value={c.nombre}>{c.nombre} ({c.tipo || 'TEXT'})</option>
+                                  ))}
+                                </select>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {dbTabla && modalDb.tablas.find(t => t.nombre === dbTabla)?.muestra?.length > 0 && (
+                <div>
+                  <p className={CLS_LABEL}>Vista previa (5 primeras filas)</p>
+                  <div className="rounded-xl border border-[#2d3348] overflow-auto max-h-40">
+                    <table className="text-xs text-slate-400 w-full">
+                      <thead>
+                        <tr className="bg-[#161b2a]">
+                          {(modalDb.tablas.find(t => t.nombre === dbTabla)?.columnas ?? []).map(c => (
+                            <th key={c.nombre} className="px-3 py-2 text-left font-medium whitespace-nowrap">{c.nombre}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#2d3348]/30">
+                        {modalDb.tablas.find(t => t.nombre === dbTabla).muestra.map((row, i) => (
+                          <tr key={i}>
+                            {(modalDb.tablas.find(t => t.nombre === dbTabla)?.columnas ?? []).map(c => (
+                              <td key={c.nombre} className="px-3 py-1.5 whitespace-nowrap max-w-[12rem] truncate">
+                                {String(row[c.nombre] ?? '')}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 px-6 py-4 border-t border-[#2d3348] shrink-0">
+              <button onClick={() => setModalDb(null)} className="flex-1 py-2 rounded-lg bg-[#2a2f42] hover:bg-[#323850] border border-[#2d3348] text-slate-200 text-sm font-medium transition">
+                Cancelar
+              </button>
+              <button
+                onClick={ejecutarImportDb}
+                disabled={importandoDb || !dbMapeo.descripcion || !dbTabla}
+                className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-900/30"
+              >
+                {importandoDb ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    Importando...
+                  </span>
+                ) : (
+                  `Importar ${(modalDb.tablas.find(t => t.nombre === dbTabla)?.total ?? 0).toLocaleString('es-AR')} registros`
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal resultado importación ── */}
       {resultImport && (

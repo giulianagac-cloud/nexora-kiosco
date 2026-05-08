@@ -44,7 +44,9 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   importar: {
-    excel: () => invoke('importar:excel')
+    excel:         ()       => invoke('importar:excel'),
+    inspeccionarDb: ()      => invoke('importar:inspeccionar-db'),
+    desdeDb:       (params) => invoke('importar:desde-db', params),
   },
 
   config: {

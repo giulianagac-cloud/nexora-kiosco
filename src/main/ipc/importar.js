@@ -1,41 +1,19 @@
 import { dialog, BrowserWindow } from 'electron'
 import XLSX from 'xlsx'
+import Database from 'better-sqlite3'
 
 export function registerImportarHandlers(ipcMain, db) {
-  ipcMain.handle('importar:excel', async (event) => {
-    const win = BrowserWindow.fromWebContents(event.sender)
 
-    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
-      title: 'Seleccionar archivo Excel',
-      filters: [{ name: 'Excel', extensions: ['xlsx', 'xls'] }],
-      properties: ['openFile']
-    })
-
-    if (canceled || !filePaths.length) return null
-
-    const workbook = XLSX.readFile(filePaths[0])
-    const sheet = workbook.Sheets[workbook.SheetNames[0]]
-    const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
-
-    if (!rawRows.length) return { insertados: 0, actualizados: 0, omitidos: 0, errores: [] }
-
-    // Normalizar claves a minúsculas
-    const rows = rawRows.map(row => {
-      const n = {}
-      for (const k of Object.keys(row)) n[k.toLowerCase()] = row[k]
-      return n
-    })
-
-    // Ajustar SQLite para importación masiva
-    db.pragma('cache_size = -65536') // 64 MB
+  // ── Lógica compartida de inserción masiva ──────────────────────────────────
+  // filas: [{ nombre, codigo, rubroRaw, precio_costo, iva, utilidad_minorista,
+  //           precio, stock, stock_minimo, stock_maximo }]
+  function importarProductos(filas) {
+    db.pragma('cache_size = -65536')
     db.pragma('temp_store = MEMORY')
 
-    // Cargar categorías existentes en memoria
     const catMap = new Map(
       db.prepare('SELECT id, nombre FROM categorias').all().map(c => [c.nombre.toLowerCase(), c.id])
     )
-
-    // Pre-cargar productos existentes en Maps para evitar SELECTs por fila
     const byCode = new Map(
       db.prepare('SELECT id, codigo_barras FROM productos WHERE codigo_barras IS NOT NULL AND activo = 1')
         .all().map(p => [p.codigo_barras, p.id])
@@ -46,8 +24,8 @@ export function registerImportarHandlers(ipcMain, db) {
     )
 
     const stmts = {
-      insertCat:  db.prepare('INSERT OR IGNORE INTO categorias (nombre) VALUES (?)'),
-      getCat:     db.prepare('SELECT id FROM categorias WHERE nombre = ?'),
+      insertCat: db.prepare('INSERT OR IGNORE INTO categorias (nombre) VALUES (?)'),
+      getCat:    db.prepare('SELECT id FROM categorias WHERE nombre = ?'),
       insert: db.prepare(`
         INSERT INTO productos
           (nombre, codigo_barras, categoria_id,
@@ -64,17 +42,17 @@ export function registerImportarHandlers(ipcMain, db) {
       `),
       update: db.prepare(`
         UPDATE productos SET
-          nombre            = @nombre,
-          codigo_barras     = @codigo_barras,
-          categoria_id      = @categoria_id,
-          precio_costo      = @precio_costo,
-          iva               = @iva,
-          utilidad_minorista= @utilidad_minorista,
-          precio            = @precio,
-          stock             = @stock,
-          stock_minimo      = @stock_minimo,
-          stock_maximo      = @stock_maximo,
-          updated_at        = datetime('now','localtime')
+          nombre             = @nombre,
+          codigo_barras      = @codigo_barras,
+          categoria_id       = @categoria_id,
+          precio_costo       = @precio_costo,
+          iva                = @iva,
+          utilidad_minorista = @utilidad_minorista,
+          precio             = @precio,
+          stock              = @stock,
+          stock_minimo       = @stock_minimo,
+          stock_maximo       = @stock_maximo,
+          updated_at         = datetime('now','localtime')
         WHERE id = @id
       `)
     }
@@ -83,16 +61,10 @@ export function registerImportarHandlers(ipcMain, db) {
     const errores = []
 
     db.transaction(() => {
-      rows.forEach((row, i) => {
-        const fila = i + 2
-        const nombre = String(row.descripcion ?? '').trim()
+      filas.forEach(({ nombre, codigo, rubroRaw, precio_costo, iva, utilidad_minorista, precio, stock, stock_minimo, stock_maximo }, i) => {
         if (!nombre) { omitidos++; return }
 
-        const codigo = String(row.codigo ?? '').trim() || null
-
-        // Rubro → categoria_id
         let categoria_id = null
-        const rubroRaw = String(row.rubro ?? '').trim()
         if (rubroRaw) {
           const key = rubroRaw.toLowerCase()
           if (catMap.has(key)) {
@@ -104,27 +76,19 @@ export function registerImportarHandlers(ipcMain, db) {
           }
         }
 
-        const precio_costo       = parseFloat(row.preciocosto)   || 0
-        const iva                = parseFloat(row.iva)           ?? 21
-        const utilidad_minorista = parseFloat(row.utilidad)      || 0
-        const precioVentaExcel   = parseFloat(row.precioventa)   || 0
-        const precio = precioVentaExcel > 0
-          ? precioVentaExcel
-          : +(precio_costo * (1 + iva / 100) * (1 + utilidad_minorista / 100)).toFixed(2)
-
         const datos = {
           nombre,
-          codigo_barras:      codigo,
+          codigo_barras:      codigo || null,
           categoria_id,
-          precio_costo,
-          iva,
-          utilidad_minorista,
-          precio,
+          precio_costo:       precio_costo       || 0,
+          iva:                iva                || 21,
+          utilidad_minorista: utilidad_minorista || 0,
+          precio:             precio             || 0,
           utilidad_mayorista: 0,
           precio_mayorista:   0,
-          stock:       parseInt(row.stock)       || 0,
-          stock_minimo:parseInt(row.stockminimo) || 0,
-          stock_maximo:parseInt(row.stockmaximo) || 0
+          stock:              stock        || 0,
+          stock_minimo:       stock_minimo || 0,
+          stock_maximo:       stock_maximo || 0,
         }
 
         try {
@@ -141,11 +105,118 @@ export function registerImportarHandlers(ipcMain, db) {
             byNombre.set(nombre, result.lastInsertRowid)
           }
         } catch (e) {
-          errores.push({ fila, motivo: e.message })
+          errores.push({ fila: i + 2, motivo: e.message })
         }
       })
     })()
 
     return { insertados, actualizados, omitidos, errores }
+  }
+
+  // ── Handler: Importar Excel ────────────────────────────────────────────────
+  ipcMain.handle('importar:excel', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: 'Seleccionar archivo Excel',
+      filters: [{ name: 'Excel', extensions: ['xlsx', 'xls'] }],
+      properties: ['openFile']
+    })
+    if (canceled || !filePaths.length) return null
+
+    const workbook = XLSX.readFile(filePaths[0])
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+    if (!rawRows.length) return { insertados: 0, actualizados: 0, omitidos: 0, errores: [] }
+
+    const filas = rawRows.map(row => {
+      const r = {}
+      for (const k of Object.keys(row)) r[k.toLowerCase()] = row[k]
+      const precio_costo       = parseFloat(r.preciocosto) || 0
+      const iva                = parseFloat(r.iva)         || 21
+      const utilidad_minorista = parseFloat(r.utilidad)    || 0
+      const precioVentaExcel   = parseFloat(r.precioventa) || 0
+      return {
+        nombre:             String(r.descripcion ?? '').trim(),
+        codigo:             String(r.codigo ?? '').trim()  || null,
+        rubroRaw:           String(r.rubro ?? '').trim()   || null,
+        precio_costo,
+        iva,
+        utilidad_minorista,
+        precio: precioVentaExcel > 0
+          ? precioVentaExcel
+          : +(precio_costo * (1 + iva / 100) * (1 + utilidad_minorista / 100)).toFixed(2),
+        stock:        parseInt(r.stock)       || 0,
+        stock_minimo: parseInt(r.stockminimo) || 0,
+        stock_maximo: parseInt(r.stockmaximo) || 0,
+      }
+    })
+
+    return importarProductos(filas)
+  })
+
+  // ── Handler: Inspeccionar DB externa ──────────────────────────────────────
+  ipcMain.handle('importar:inspeccionar-db', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: 'Seleccionar base de datos SQLite',
+      filters: [{ name: 'SQLite', extensions: ['db', 'sqlite', 'sqlite3'] }],
+      properties: ['openFile']
+    })
+    if (canceled || !filePaths.length) return null
+
+    const filePath = filePaths[0]
+    let extDb
+    try {
+      extDb = new Database(filePath, { readonly: true })
+      const tablas = extDb
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+        .all()
+
+      const schema = tablas.map(({ name }) => {
+        const columnas = extDb.prepare(`PRAGMA table_info("${name}")`).all()
+          .map(c => ({ nombre: c.name, tipo: c.type }))
+        const total = extDb.prepare(`SELECT COUNT(*) as n FROM "${name}"`).get()?.n ?? 0
+        const muestra = extDb.prepare(`SELECT * FROM "${name}" LIMIT 5`).all()
+        return { nombre: name, columnas, total, muestra }
+      })
+
+      return { filePath, tablas: schema }
+    } finally {
+      extDb?.close()
+    }
+  })
+
+  // ── Handler: Importar desde DB externa ────────────────────────────────────
+  ipcMain.handle('importar:desde-db', (_, { filePath, tabla, mapeo }) => {
+    let extDb
+    try {
+      extDb = new Database(filePath, { readonly: true })
+      const rawRows = extDb.prepare(`SELECT * FROM "${tabla}"`).all()
+      if (!rawRows.length) return { insertados: 0, actualizados: 0, omitidos: 0, errores: [] }
+
+      const filas = rawRows.map(row => {
+        const precio_costo = mapeo.precio_costo ? parseFloat(row[mapeo.precio_costo]) || 0  : 0
+        const iva          = mapeo.iva          ? parseFloat(row[mapeo.iva])          || 21 : 21
+        const precioVenta  = mapeo.precio_venta ? parseFloat(row[mapeo.precio_venta]) || 0  : 0
+        return {
+          nombre:             String(row[mapeo.descripcion] ?? '').trim(),
+          codigo:             mapeo.codigo     ? String(row[mapeo.codigo] ?? '').trim()  || null : null,
+          rubroRaw:           mapeo.rubro      ? String(row[mapeo.rubro] ?? '').trim()   || null : null,
+          precio_costo,
+          iva,
+          utilidad_minorista: 0,
+          precio: precioVenta > 0
+            ? precioVenta
+            : +(precio_costo * (1 + iva / 100)).toFixed(2),
+          stock:        mapeo.stock        ? parseInt(row[mapeo.stock])        || 0 : 0,
+          stock_minimo: mapeo.stock_minimo ? parseInt(row[mapeo.stock_minimo]) || 0 : 0,
+          stock_maximo: mapeo.stock_maximo ? parseInt(row[mapeo.stock_maximo]) || 0 : 0,
+        }
+      })
+
+      return importarProductos(filas)
+    } finally {
+      extDb?.close()
+    }
   })
 }
