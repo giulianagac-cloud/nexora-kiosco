@@ -26,16 +26,28 @@ export function registerImportarHandlers(ipcMain, db) {
       return n
     })
 
+    // Ajustar SQLite para importación masiva
+    db.pragma('cache_size = -65536') // 64 MB
+    db.pragma('temp_store = MEMORY')
+
     // Cargar categorías existentes en memoria
     const catMap = new Map(
       db.prepare('SELECT id, nombre FROM categorias').all().map(c => [c.nombre.toLowerCase(), c.id])
     )
 
+    // Pre-cargar productos existentes en Maps para evitar SELECTs por fila
+    const byCode = new Map(
+      db.prepare('SELECT id, codigo_barras FROM productos WHERE codigo_barras IS NOT NULL AND activo = 1')
+        .all().map(p => [p.codigo_barras, p.id])
+    )
+    const byNombre = new Map(
+      db.prepare('SELECT id, nombre FROM productos WHERE activo = 1')
+        .all().map(p => [p.nombre, p.id])
+    )
+
     const stmts = {
       insertCat:  db.prepare('INSERT OR IGNORE INTO categorias (nombre) VALUES (?)'),
       getCat:     db.prepare('SELECT id FROM categorias WHERE nombre = ?'),
-      getByCode:  db.prepare(`SELECT id FROM productos WHERE codigo_barras = ? AND activo = 1`),
-      getByNombre:db.prepare(`SELECT id FROM productos WHERE nombre = ? AND activo = 1 LIMIT 1`),
       insert: db.prepare(`
         INSERT INTO productos
           (nombre, codigo_barras, categoria_id,
@@ -116,14 +128,17 @@ export function registerImportarHandlers(ipcMain, db) {
         }
 
         try {
-          const existente = (codigo ? stmts.getByCode.get(codigo) : null)
-                         ?? stmts.getByNombre.get(nombre)
-          if (existente) {
-            stmts.update.run({ ...datos, id: existente.id })
+          const existenteId = (codigo ? byCode.get(codigo) : undefined) ?? byNombre.get(nombre)
+          if (existenteId !== undefined) {
+            stmts.update.run({ ...datos, id: existenteId })
             actualizados++
+            if (codigo) byCode.set(codigo, existenteId)
+            byNombre.set(nombre, existenteId)
           } else {
-            stmts.insert.run(datos)
+            const result = stmts.insert.run(datos)
             insertados++
+            if (codigo) byCode.set(codigo, result.lastInsertRowid)
+            byNombre.set(nombre, result.lastInsertRowid)
           }
         } catch (e) {
           errores.push({ fila, motivo: e.message })
