@@ -91,6 +91,7 @@ export default function Articulos() {
   const [modalDb, setModalDb]           = useState(null)
   const [dbTabla, setDbTabla]           = useState('')
   const [dbMapeo, setDbMapeo]           = useState({})
+  const [dbLimpiar, setDbLimpiar]       = useState(false)
   const [importandoDb, setImportandoDb] = useState(false)
   const [dbProgreso, setDbProgreso]     = useState(null)
 
@@ -278,7 +279,7 @@ export default function Articulos() {
     setDbProgreso({ done: 0, total: modalDb.tablas.find(t => t.nombre === dbTabla)?.total ?? 0 })
     window.api.importar.onProgreso(data => setDbProgreso(data))
     try {
-      const resultado = await window.api.importar.desdeDb({ filePath: modalDb.filePath, tabla: dbTabla, mapeo: dbMapeo })
+      const resultado = await window.api.importar.desdeDb({ filePath: modalDb.filePath, tabla: dbTabla, mapeo: dbMapeo, limpiar: dbLimpiar })
       setResultImport(resultado)
       setModalDb(null)
       await cargarDatos()
@@ -629,6 +630,21 @@ export default function Articulos() {
                   </div>
                 </div>
               )}
+            </div>
+
+            <div className="px-6 pb-3 shrink-0">
+              <label className="flex items-center gap-3 cursor-pointer select-none p-3 rounded-xl border border-rose-500/20 bg-rose-950/20 hover:bg-rose-950/30 transition">
+                <input
+                  type="checkbox"
+                  checked={dbLimpiar}
+                  onChange={e => setDbLimpiar(e.target.checked)}
+                  className="w-4 h-4 rounded border-[#2d3348] bg-[#161b2a] accent-rose-500 cursor-pointer"
+                />
+                <div>
+                  <span className="text-sm font-medium text-rose-300">Reemplazar artículos existentes</span>
+                  <p className="text-xs text-rose-500/70 mt-0.5">Elimina todos los artículos antes de importar (evita duplicados)</p>
+                </div>
+              </label>
             </div>
 
             <div className="flex gap-3 px-6 py-4 border-t border-[#2d3348] shrink-0">
