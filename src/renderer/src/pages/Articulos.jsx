@@ -76,6 +76,7 @@ const FORM_VACIO = {
 // ── component ─────────────────────────────────────────────────────────────────
 export default function Articulos() {
   const [productos, setProductos] = useState([])
+  const [totalProductos, setTotalProductos] = useState(0)
   const [categorias, setCategorias] = useState([])
   const [busqueda, setBusqueda] = useState('')
   const [selectedId, setSelectedId] = useState(null)
@@ -88,6 +89,7 @@ export default function Articulos() {
   const [resultImport, setResultImport] = useState(null)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const checkAllRef = useRef(null)
+  const firstSearchRun = useRef(true)
   const [modalDb, setModalDb]           = useState(null)
   const [dbTabla, setDbTabla]           = useState('')
   const [dbMapeo, setDbMapeo]           = useState({})
@@ -97,20 +99,29 @@ export default function Articulos() {
 
   useEffect(() => { cargarDatos() }, [])
 
+  // Búsqueda server-side con debounce — no filtra en memoria
+  useEffect(() => {
+    if (firstSearchRun.current) { firstSearchRun.current = false; return }
+    const timer = setTimeout(() => {
+      window.api.productos.listar(busqueda ? { busqueda } : {})
+        .then(prods => setProductos(prods))
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [busqueda])
+
   async function cargarDatos() {
-    const [prods, cats] = await Promise.all([
+    const [prods, cats, total] = await Promise.all([
       window.api.productos.listar(),
       window.api.categorias.listar(),
+      window.api.productos.total(),
     ])
     setProductos(prods)
     setCategorias(cats)
+    setTotalProductos(total)
   }
 
   // ── derived ────────────────────────────────────────────────────────────────
-  const productosFiltrados = productos.filter((p) => {
-    const q = busqueda.toLowerCase()
-    return !q || p.nombre.toLowerCase().includes(q) || (p.codigo_barras ?? '').includes(q)
-  })
+  const productosFiltrados = productos
 
   const selectedItem = productos.find((p) => p.id === selectedId) ?? null
 
@@ -327,7 +338,12 @@ export default function Articulos() {
       <div className="px-6 pt-6 pb-3 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white">Artículos</h1>
-          <p className="text-sm text-slate-400 mt-0.5">{productos.length} artículos registrados</p>
+          <p className="text-sm text-slate-400 mt-0.5">
+            {totalProductos.toLocaleString('es-AR')} artículos registrados
+            {productos.length < totalProductos && !busqueda && (
+              <span className="ml-1 text-amber-400">(mostrando {productos.length.toLocaleString('es-AR')} — usá el buscador)</span>
+            )}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={abrirImportDb} className={CLS_BTN_GHOST}>

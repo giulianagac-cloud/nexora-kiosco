@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('api', {
 
   productos: {
     listar: (filtros) => invoke('productos:listar', filtros),
+    total: () => invoke('productos:total'),
     buscarCodigo: (codigo) => invoke('productos:buscar-codigo', codigo),
     crear: (producto) => invoke('productos:crear', producto),
     actualizar: (producto) => invoke('productos:actualizar', producto),

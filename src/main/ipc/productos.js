@@ -21,8 +21,13 @@ export function registerProductosHandlers(ipcMain, db) {
       params.push(filtros.estado)
     }
 
-    query += ' ORDER BY p.nombre ASC'
+    const limite = filtros.busqueda ? 500 : 5000
+    query += ` ORDER BY p.nombre ASC LIMIT ${limite}`
     return db.prepare(query).all(...params)
+  })
+
+  ipcMain.handle('productos:total', () => {
+    return db.prepare('SELECT COUNT(*) as n FROM productos WHERE activo = 1').get()?.n ?? 0
   })
 
   ipcMain.handle('productos:buscar-codigo', (_, codigo) => {
