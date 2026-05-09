@@ -143,6 +143,18 @@ export default function Compras() {
 
   const total = items.reduce((s, i) => s + i.precio_costo * i.cantidad, 0)
 
+  // ── anular compra ─────────────────────────────────────────────────────────
+  async function anularCompra(id) {
+    if (!confirm('¿Anular esta compra?\nSe revertirá el stock de todos los productos.')) return
+    try {
+      await window.api.compras.anular(id)
+      await cargarCompras()
+      if (detalleModal?.id === id) setDetalleModal(prev => ({ ...prev, anulada: 1 }))
+    } catch (e) {
+      alert(e.message)
+    }
+  }
+
   // ── confirmar compra ──────────────────────────────────────────────────────
   async function confirmarCompra() {
     if (!items.length) return
@@ -396,7 +408,7 @@ export default function Compras() {
                 </thead>
                 <tbody className="divide-y divide-[#2d3348]/50">
                   {compras.map((c, i) => (
-                    <tr key={c.id} className={i % 2 !== 0 ? 'bg-[#1f2437]' : ''}>
+                    <tr key={c.id} className={`${i % 2 !== 0 ? 'bg-[#1f2437]' : ''} ${c.anulada ? 'opacity-50' : ''}`}>
                       <td className="px-4 py-3 text-slate-600 text-xs font-mono">{c.id}</td>
                       <td className="px-4 py-3 text-slate-400 text-xs tabular-nums">{c.fecha}</td>
                       <td className="px-4 py-3 text-slate-300">
@@ -404,22 +416,35 @@ export default function Compras() {
                         {c.observaciones && (
                           <span className="ml-2 text-xs text-slate-500 italic">{c.observaciones}</span>
                         )}
+                        {c.anulada ? (
+                          <span className="ml-2 text-[10px] bg-rose-900/30 text-rose-400 px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide">Anulada</span>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className="inline-flex items-center justify-center min-w-[1.75rem] px-1.5 py-0.5 rounded text-xs font-medium bg-slate-700/60 text-slate-300">
                           {c.cantidad_items}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold text-emerald-400 tabular-nums">
+                      <td className={`px-4 py-3 text-right font-semibold tabular-nums ${c.anulada ? 'text-slate-500 line-through' : 'text-emerald-400'}`}>
                         {fmt(c.total)}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => verDetalle(c.id)}
-                          className="text-xs text-slate-400 hover:text-slate-200 transition px-2 py-1 rounded hover:bg-[#2d3348]"
-                        >
-                          Ver
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => verDetalle(c.id)}
+                            className="text-xs text-slate-400 hover:text-slate-200 transition px-2 py-1 rounded hover:bg-[#2d3348]"
+                          >
+                            Ver
+                          </button>
+                          {!c.anulada && (
+                            <button
+                              onClick={() => anularCompra(c.id)}
+                              className="text-xs text-rose-500 hover:text-rose-400 transition px-2 py-1 rounded hover:bg-rose-900/20"
+                            >
+                              Anular
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -517,17 +542,32 @@ export default function Compras() {
           <div className="w-full max-w-xl rounded-2xl border border-[#2d3348] bg-[#1e2334] shadow-2xl flex flex-col" style={{ maxHeight: '85vh' }}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#2d3348] shrink-0">
               <div>
-                <h2 className="font-semibold text-white">Compra #{detalleModal.id}</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-semibold text-white">Compra #{detalleModal.id}</h2>
+                  {detalleModal.anulada ? (
+                    <span className="text-[10px] bg-rose-900/30 text-rose-400 px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide">Anulada</span>
+                  ) : null}
+                </div>
                 <p className="text-xs text-slate-500 mt-0.5">{detalleModal.fecha}</p>
               </div>
-              <button
-                onClick={() => setDetalleModal(null)}
-                className="text-slate-500 hover:text-slate-300 transition p-1 rounded-lg hover:bg-[#2d3348]"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-2">
+                {!detalleModal.anulada && (
+                  <button
+                    onClick={() => anularCompra(detalleModal.id)}
+                    className="text-xs text-rose-500 hover:text-rose-400 transition px-3 py-1.5 rounded-lg hover:bg-rose-900/20 border border-rose-800/40"
+                  >
+                    Anular compra
+                  </button>
+                )}
+                <button
+                  onClick={() => setDetalleModal(null)}
+                  className="text-slate-500 hover:text-slate-300 transition p-1 rounded-lg hover:bg-[#2d3348]"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto min-h-0">

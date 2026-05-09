@@ -72,9 +72,31 @@ export function registerComprasHandlers(ipcMain, db) {
     })()
   })
 
+  ipcMain.handle('compras:anular', (_, compraId) => {
+    return db.transaction(() => {
+      const compra = db.prepare('SELECT id, anulada FROM compras WHERE id = ?').get(compraId)
+      if (!compra) throw new Error('Compra no encontrada')
+      if (compra.anulada) throw new Error('La compra ya está anulada')
+
+      const items = db.prepare(
+        'SELECT producto_id, cantidad FROM detalle_compras WHERE compra_id = ?'
+      ).all(compraId)
+
+      const revertirStock = db.prepare(
+        'UPDATE productos SET stock = stock - @cantidad, updated_at = datetime(\'now\',\'localtime\') WHERE id = @id'
+      )
+      for (const item of items) {
+        if (item.producto_id) revertirStock.run({ cantidad: item.cantidad, id: item.producto_id })
+      }
+
+      db.prepare('UPDATE compras SET anulada = 1 WHERE id = ?').run(compraId)
+      return { ok: true }
+    })()
+  })
+
   ipcMain.handle('compras:listar', (_, { limite = 100 } = {}) => {
     return db.prepare(`
-      SELECT c.id, c.total, c.observaciones, c.fecha,
+      SELECT c.id, c.total, c.observaciones, c.fecha, c.anulada,
              p.razon_social AS proveedor_nombre,
              COUNT(d.id) AS cantidad_items
       FROM compras c

@@ -167,6 +167,7 @@ export function createSchema(db) {
       proveedor_id  INTEGER REFERENCES proveedores(id) ON DELETE SET NULL,
       total         REAL NOT NULL DEFAULT 0,
       observaciones TEXT,
+      anulada       INTEGER NOT NULL DEFAULT 0,
       fecha         TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
 
@@ -184,6 +185,7 @@ export function createSchema(db) {
   migrateVentas(db)
   migrateProductos(db)
   migrateUsuarios(db)
+  migrateCompras(db)
   seedInitialData(db)
 }
 
@@ -267,6 +269,10 @@ function migrateProductos(db) {
   for (const sql of cols) {
     try { db.exec(sql) } catch (_) { /* column already exists */ }
   }
+}
+
+function migrateCompras(db) {
+  try { db.exec(`ALTER TABLE compras ADD COLUMN anulada INTEGER NOT NULL DEFAULT 0`) } catch (_) {}
 }
 
 function seedInitialData(db) {

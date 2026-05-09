@@ -108,6 +108,7 @@ contextBridge.exposeInMainWorld('api', {
     crear:        (datos)  => invoke('compras:crear', datos),
     listar:       (filtros) => invoke('compras:listar', filtros),
     detalle:      (id)     => invoke('compras:detalle', id),
+    anular:       (id)     => invoke('compras:anular', id),
   },
 
   listados: {
