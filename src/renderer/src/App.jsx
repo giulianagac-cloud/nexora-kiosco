@@ -33,12 +33,12 @@ export default function App() {
           <Route path="/" element={<Navigate to="/venta" replace />} />
           <Route path="/venta" element={<Venta />} />
           <Route path="/caja" element={<Caja />} />
-          <Route path="/articulos" element={<RequireAdmin usuario={usuario}><Articulos /></RequireAdmin>} />
-          <Route path="/historial" element={<RequireAdmin usuario={usuario}><Historial /></RequireAdmin>} />
-          <Route path="/compras" element={<RequireAdmin usuario={usuario}><Compras /></RequireAdmin>} />
-          <Route path="/clientes" element={<RequireAdmin usuario={usuario}><Clientes /></RequireAdmin>} />
-          <Route path="/proveedores" element={<RequireAdmin usuario={usuario}><Proveedores /></RequireAdmin>} />
-          <Route path="/listados" element={<RequireAdmin usuario={usuario}><Listados /></RequireAdmin>} />
+          <Route path="/articulos" element={<Articulos />} />
+          <Route path="/historial" element={<Historial />} />
+          <Route path="/compras" element={<Compras />} />
+          <Route path="/clientes" element={<Clientes />} />
+          <Route path="/proveedores" element={<Proveedores />} />
+          <Route path="/listados" element={<Listados />} />
           <Route path="/informes" element={<RequireAdmin usuario={usuario}><Informes /></RequireAdmin>} />
           <Route path="/configuracion" element={<RequireAdmin usuario={usuario}><Configuracion /></RequireAdmin>} />
         </Routes>
