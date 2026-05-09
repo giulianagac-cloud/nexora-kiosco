@@ -310,6 +310,7 @@ export default function Historial() {
                 <thead>
                   <tr className="text-left text-xs text-slate-500 uppercase tracking-wider border-b border-[#313545]">
                     <th className="pb-2.5 font-medium">Producto</th>
+                    <th className="pb-2.5 font-medium w-32">Código</th>
                     <th className="pb-2.5 font-medium text-center w-16">Cant.</th>
                     <th className="pb-2.5 font-medium text-right w-28">P. Unit.</th>
                     <th className="pb-2.5 font-medium text-right w-28">Importe</th>
@@ -319,6 +320,7 @@ export default function Historial() {
                   {detalle.items?.map((item, i) => (
                     <tr key={i}>
                       <td className="py-2.5 text-slate-200 pr-4">{item.nombre_producto}</td>
+                      <td className="py-2.5 text-slate-500 text-xs font-mono">{item.codigo_barras ?? '—'}</td>
                       <td className="py-2.5 text-center text-slate-400">{item.cantidad}</td>
                       <td className="py-2.5 text-right text-slate-400 tabular-nums">{fmt(item.precio_unitario)}</td>
                       <td className="py-2.5 text-right font-medium text-slate-100 tabular-nums">{fmt(item.subtotal)}</td>
