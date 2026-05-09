@@ -123,7 +123,9 @@ export default function Articulos() {
   // ── derived ────────────────────────────────────────────────────────────────
   const productosFiltrados = productos
 
-  const selectedItem = productos.find((p) => p.id === selectedId) ?? null
+  // Row-click takes precedence; single checked checkbox also enables edit/discontinue
+  const singleTarget = selectedId ?? (selectedIds.size === 1 ? [...selectedIds][0] : null)
+  const selectedItem = productos.find((p) => p.id === singleTarget) ?? null
 
   const allChecked = productosFiltrados.length > 0 && productosFiltrados.every((p) => selectedIds.has(p.id))
   const someChecked = productosFiltrados.some((p) => selectedIds.has(p.id))
@@ -321,13 +323,17 @@ export default function Articulos() {
 
   async function toggleDiscontinuar() {
     if (!selectedItem) return
-    if (selectedItem.estado === 'discontinuado') {
-      await window.api.productos.reactivar(selectedItem.id)
-    } else {
-      if (!confirm(`¿Discontinuar "${selectedItem.nombre}"?\nNo podrá venderse hasta reactivarlo.`)) return
-      await window.api.productos.discontinuar(selectedItem.id)
+    try {
+      if (selectedItem.estado === 'discontinuado') {
+        await window.api.productos.reactivar(selectedItem.id)
+      } else {
+        if (!confirm(`¿Discontinuar "${selectedItem.nombre}"?\nNo podrá venderse hasta reactivarlo.`)) return
+        await window.api.productos.discontinuar(selectedItem.id)
+      }
+      await cargarDatos()
+    } catch (e) {
+      setError(e.message)
     }
-    await cargarDatos()
   }
 
   // ── render ─────────────────────────────────────────────────────────────────
@@ -370,7 +376,7 @@ export default function Articulos() {
             )}
             {importando ? 'Importando...' : 'Importar Excel'}
           </button>
-          <button onClick={abrirEditar} disabled={!selectedId} className={CLS_BTN_GHOST}>
+          <button onClick={abrirEditar} disabled={!singleTarget} className={CLS_BTN_GHOST}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
@@ -378,7 +384,7 @@ export default function Articulos() {
           </button>
           <button
             onClick={toggleDiscontinuar}
-            disabled={!selectedId}
+            disabled={!singleTarget}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#2a2f42] hover:bg-[#323850] border border-[#2d3348] text-amber-400 text-sm font-medium transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">

@@ -10,6 +10,7 @@ import Clientes from '@/pages/Clientes'
 import Proveedores from '@/pages/Proveedores'
 import Listados from '@/pages/Listados'
 import Informes from '@/pages/Informes'
+import Compras from '@/pages/Compras'
 import Login from '@/pages/Login'
 
 function RequireAdmin({ usuario, children }) {
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/caja" element={<Caja />} />
           <Route path="/articulos" element={<RequireAdmin usuario={usuario}><Articulos /></RequireAdmin>} />
           <Route path="/historial" element={<RequireAdmin usuario={usuario}><Historial /></RequireAdmin>} />
+          <Route path="/compras" element={<RequireAdmin usuario={usuario}><Compras /></RequireAdmin>} />
           <Route path="/clientes" element={<RequireAdmin usuario={usuario}><Clientes /></RequireAdmin>} />
           <Route path="/proveedores" element={<RequireAdmin usuario={usuario}><Proveedores /></RequireAdmin>} />
           <Route path="/listados" element={<RequireAdmin usuario={usuario}><Listados /></RequireAdmin>} />

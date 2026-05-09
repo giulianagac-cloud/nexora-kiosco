@@ -103,6 +103,13 @@ contextBridge.exposeInMainWorld('api', {
     agregarMovimiento: (datos)   => invoke('proveedores:agregar-movimiento', datos),
   },
 
+  compras: {
+    buscarCodigo: (codigo) => invoke('compras:buscar-codigo', codigo),
+    crear:        (datos)  => invoke('compras:crear', datos),
+    listar:       (filtros) => invoke('compras:listar', filtros),
+    detalle:      (id)     => invoke('compras:detalle', id),
+  },
+
   listados: {
     listaPrecios:    (tipo) => invoke('listados:lista-precios', tipo),
     reposicion:      ()     => invoke('listados:reposicion'),

@@ -161,6 +161,24 @@ export function createSchema(db) {
       descripcion    TEXT,
       fecha          TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
+
+    CREATE TABLE IF NOT EXISTS compras (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      proveedor_id  INTEGER REFERENCES proveedores(id) ON DELETE SET NULL,
+      total         REAL NOT NULL DEFAULT 0,
+      observaciones TEXT,
+      fecha         TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS detalle_compras (
+      id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+      compra_id             INTEGER NOT NULL REFERENCES compras(id) ON DELETE CASCADE,
+      producto_id           INTEGER REFERENCES productos(id) ON DELETE SET NULL,
+      nombre_producto       TEXT NOT NULL,
+      precio_costo_unitario REAL NOT NULL DEFAULT 0,
+      cantidad              INTEGER NOT NULL DEFAULT 1,
+      subtotal              REAL NOT NULL DEFAULT 0
+    );
   `)
 
   migrateVentas(db)
