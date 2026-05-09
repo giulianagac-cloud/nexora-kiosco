@@ -105,9 +105,12 @@ export function registerVentasHandlers(ipcMain, db) {
 
   ipcMain.handle('ventas:detalle', (_, ventaId) => {
     const venta = db.prepare('SELECT * FROM ventas WHERE id = ?').get(ventaId)
-    const items = db
-      .prepare('SELECT * FROM detalle_ventas WHERE venta_id = ?')
-      .all(ventaId)
+    const items = db.prepare(`
+      SELECT dv.*, p.codigo_barras
+      FROM detalle_ventas dv
+      LEFT JOIN productos p ON p.id = dv.producto_id
+      WHERE dv.venta_id = ?
+    `).all(ventaId)
     return { ...venta, items }
   })
 
