@@ -278,6 +278,7 @@ function migrateCompras(db) {
 
 function migrateCaja(db) {
   try { db.exec(`ALTER TABLE movimientos_caja ADD COLUMN anulado INTEGER NOT NULL DEFAULT 0`) } catch (_) {}
+  try { db.exec(`ALTER TABLE movimientos_caja ADD COLUMN anulado_por TEXT`) } catch (_) {}
 }
 
 function seedInitialData(db) {

@@ -157,7 +157,7 @@ export default function Caja({ usuario }) {
     if (!confirm('¿Anular este movimiento? Se registrará el movimiento inverso automáticamente.')) return
     setProcesando(true)
     try {
-      await window.api.caja.anularMovimiento(movId)
+      await window.api.caja.anularMovimiento(movId, usuario?.nombre)
       const [movs, sd] = await Promise.all([
         window.api.caja.movimientos(sesion.id),
         window.api.caja.saldoSesion(sesion.id),
@@ -349,7 +349,7 @@ export default function Caja({ usuario }) {
                   <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider w-32">Ingreso</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider w-32">Egreso</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider w-36">Saldo</th>
-                  {esAdmin && <th className="px-4 py-3 w-10" />}
+                  <th className="px-4 py-3 w-10" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#2d3348]/50">
@@ -372,7 +372,9 @@ export default function Caja({ usuario }) {
                             {m.descripcion || (m.tipo === 'ingreso' ? 'Ingreso' : 'Egreso')}
                           </span>
                           {m.anulado && (
-                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-700 text-slate-400">Anulado</span>
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-700 text-slate-400">
+                              Anulado{m.anulado_por ? ` · ${m.anulado_por}` : ''}
+                            </span>
                           )}
                         </span>
                       </td>
@@ -395,22 +397,20 @@ export default function Caja({ usuario }) {
                           {fmt(m.balance)}
                         </span>
                       </td>
-                      {esAdmin && (
-                        <td className="px-2 py-3 text-right">
-                          {puedeAnular && (
-                            <button
-                              onClick={() => anularMovimiento(m.id)}
-                              disabled={procesando}
-                              title="Anular movimiento"
-                              className="p-1 rounded text-slate-600 hover:text-rose-400 hover:bg-rose-400/10 transition disabled:opacity-30"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
-                          )}
-                        </td>
-                      )}
+                      <td className="px-2 py-3 text-right">
+                        {puedeAnular && (
+                          <button
+                            onClick={() => anularMovimiento(m.id)}
+                            disabled={procesando}
+                            title="Anular movimiento"
+                            className="p-1 rounded text-slate-600 hover:text-rose-400 hover:bg-rose-400/10 transition disabled:opacity-30"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   )
                 })}

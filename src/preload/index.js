@@ -42,7 +42,7 @@ contextBridge.exposeInMainWorld('api', {
     movimientos: (sesionId) => invoke('caja:movimientos', sesionId),
     saldoSesion: (sesionId) => invoke('caja:saldo-sesion', sesionId),
     historial: (limite) => invoke('caja:historial', limite),
-    anularMovimiento: (id) => invoke('caja:anular-movimiento', id)
+    anularMovimiento: (movId, anuladoPor) => invoke('caja:anular-movimiento', { movId, anuladoPor })
   },
 
   importar: {
