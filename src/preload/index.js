@@ -41,7 +41,8 @@ contextBridge.exposeInMainWorld('api', {
     movimiento: (datos) => invoke('caja:movimiento', datos),
     movimientos: (sesionId) => invoke('caja:movimientos', sesionId),
     saldoSesion: (sesionId) => invoke('caja:saldo-sesion', sesionId),
-    historial: (limite) => invoke('caja:historial', limite)
+    historial: (limite) => invoke('caja:historial', limite),
+    anularMovimiento: (id) => invoke('caja:anular-movimiento', id)
   },
 
   importar: {

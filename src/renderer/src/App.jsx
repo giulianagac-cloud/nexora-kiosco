@@ -32,7 +32,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/venta" replace />} />
           <Route path="/venta" element={<Venta />} />
-          <Route path="/caja" element={<Caja />} />
+          <Route path="/caja" element={<Caja usuario={usuario} />} />
           <Route path="/articulos" element={<Articulos />} />
           <Route path="/historial" element={<Historial />} />
           <Route path="/compras" element={<Compras />} />

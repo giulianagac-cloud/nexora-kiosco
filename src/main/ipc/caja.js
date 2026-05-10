@@ -86,6 +86,25 @@ export function registerCajaHandlers(ipcMain, db) {
     }
   })
 
+  ipcMain.handle('caja:anular-movimiento', (_, movId) => {
+    return db.transaction(() => {
+      const mov = db.prepare('SELECT * FROM movimientos_caja WHERE id = ?').get(movId)
+      if (!mov) throw new Error('Movimiento no encontrado')
+      if (mov.anulado) throw new Error('El movimiento ya fue anulado')
+      if (mov.descripcion?.startsWith('Anulación:')) throw new Error('No se puede anular un movimiento de anulación')
+
+      db.prepare('UPDATE movimientos_caja SET anulado = 1 WHERE id = ?').run(movId)
+
+      const tipoInverso = mov.tipo === 'ingreso' ? 'egreso' : 'ingreso'
+      const concepto = mov.descripcion || (mov.tipo === 'ingreso' ? 'Ingreso' : 'Egreso')
+      db.prepare(
+        'INSERT INTO movimientos_caja (sesion_id, tipo, monto, descripcion) VALUES (?, ?, ?, ?)'
+      ).run(mov.sesion_id, tipoInverso, mov.monto, `Anulación: ${concepto}`)
+
+      return { ok: true }
+    })()
+  })
+
   ipcMain.handle('caja:historial', (_, limite = 30) => {
     return db
       .prepare(`

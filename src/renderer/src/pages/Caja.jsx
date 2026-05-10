@@ -24,7 +24,8 @@ const CLS_LABEL = 'block text-xs font-medium text-slate-400 mb-1.5'
 const SALDO_VACIO = { total_ventas: 0, ventas_efectivo: 0, total_ingresos: 0, total_egresos: 0 }
 
 // ── component ─────────────────────────────────────────────────────────────────
-export default function Caja() {
+export default function Caja({ usuario }) {
+  const esAdmin = usuario?.rol === 'admin'
   const [sesion, setSesion] = useState(null)
   const [movimientos, setMovimientos] = useState([])   // ASC from IPC
   const [saldoDatos, setSaldoDatos] = useState(SALDO_VACIO)
@@ -150,6 +151,24 @@ export default function Caja() {
   function abrirModalMovimiento(tipo) {
     setMovForm({ tipo, monto: '', descripcion: '' })
     setShowMovModal(true)
+  }
+
+  async function anularMovimiento(movId) {
+    if (!confirm('¿Anular este movimiento? Se registrará el movimiento inverso automáticamente.')) return
+    setProcesando(true)
+    try {
+      await window.api.caja.anularMovimiento(movId)
+      const [movs, sd] = await Promise.all([
+        window.api.caja.movimientos(sesion.id),
+        window.api.caja.saldoSesion(sesion.id),
+      ])
+      setMovimientos(movs)
+      setSaldoDatos(sd)
+    } catch (err) {
+      alert(err.message ?? 'Error al anular el movimiento')
+    } finally {
+      setProcesando(false)
+    }
   }
 
   // ── loading ───────────────────────────────────────────────────────────────
@@ -330,44 +349,71 @@ export default function Caja() {
                   <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider w-32">Ingreso</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider w-32">Egreso</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider w-36">Saldo</th>
+                  {esAdmin && <th className="px-4 py-3 w-10" />}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#2d3348]/50">
-                {movimientosConBalance.map((m, i) => (
-                  <tr key={m.id} className={i % 2 !== 0 ? 'bg-[#1f2437]' : ''}>
-                    <td className="px-4 py-3 text-xs text-slate-500 tabular-nums font-mono">
-                      {fmtHora(m.fecha)}
-                    </td>
-                    <td className="px-4 py-3 text-slate-300">
-                      <span className="inline-flex items-center gap-2">
-                        <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${
-                          m.tipo === 'apertura' ? 'bg-slate-500' :
-                          m.tipo === 'ingreso'  ? 'bg-emerald-400' : 'bg-red-400'
-                        }`} />
-                        {m.descripcion || (m.tipo === 'ingreso' ? 'Ingreso' : 'Egreso')}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      {m.tipo === 'ingreso' || m.tipo === 'apertura' ? (
-                        <span className="text-emerald-400 font-medium">{fmt(m.monto)}</span>
-                      ) : (
-                        <span className="text-slate-700">—</span>
+                {movimientosConBalance.map((m, i) => {
+                  const esAnulacion = m.descripcion?.startsWith('Anulación:')
+                  const puedeAnular = m.tipo !== 'apertura' && !m.anulado && !esAnulacion
+                  return (
+                    <tr key={m.id} className={`${i % 2 !== 0 ? 'bg-[#1f2437]' : ''} ${m.anulado ? 'opacity-50' : ''}`}>
+                      <td className="px-4 py-3 text-xs text-slate-500 tabular-nums font-mono">
+                        {fmtHora(m.fecha)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">
+                        <span className="inline-flex items-center gap-2">
+                          <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${
+                            m.tipo === 'apertura' ? 'bg-slate-500' :
+                            esAnulacion          ? 'bg-amber-400'  :
+                            m.tipo === 'ingreso' ? 'bg-emerald-400' : 'bg-red-400'
+                          }`} />
+                          <span className={m.anulado ? 'line-through text-slate-500' : ''}>
+                            {m.descripcion || (m.tipo === 'ingreso' ? 'Ingreso' : 'Egreso')}
+                          </span>
+                          {m.anulado && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-700 text-slate-400">Anulado</span>
+                          )}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {m.tipo === 'ingreso' || m.tipo === 'apertura' ? (
+                          <span className={`font-medium ${m.anulado ? 'text-slate-600' : 'text-emerald-400'}`}>{fmt(m.monto)}</span>
+                        ) : (
+                          <span className="text-slate-700">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {m.tipo === 'egreso' ? (
+                          <span className={`font-medium ${m.anulado ? 'text-slate-600' : 'text-red-400'}`}>{fmt(m.monto)}</span>
+                        ) : (
+                          <span className="text-slate-700">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                        <span className={m.balance < 0 ? 'text-red-400' : 'text-slate-200'}>
+                          {fmt(m.balance)}
+                        </span>
+                      </td>
+                      {esAdmin && (
+                        <td className="px-2 py-3 text-right">
+                          {puedeAnular && (
+                            <button
+                              onClick={() => anularMovimiento(m.id)}
+                              disabled={procesando}
+                              title="Anular movimiento"
+                              className="p-1 rounded text-slate-600 hover:text-rose-400 hover:bg-rose-400/10 transition disabled:opacity-30"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          )}
+                        </td>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      {m.tipo === 'egreso' ? (
-                        <span className="text-red-400 font-medium">{fmt(m.monto)}</span>
-                      ) : (
-                        <span className="text-slate-700">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold">
-                      <span className={m.balance < 0 ? 'text-red-400' : 'text-slate-200'}>
-                        {fmt(m.balance)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
             {movimientosConBalance.length === 0 && (

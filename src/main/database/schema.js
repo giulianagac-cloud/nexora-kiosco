@@ -186,6 +186,7 @@ export function createSchema(db) {
   migrateProductos(db)
   migrateUsuarios(db)
   migrateCompras(db)
+  migrateCaja(db)
   seedInitialData(db)
 }
 
@@ -273,6 +274,10 @@ function migrateProductos(db) {
 
 function migrateCompras(db) {
   try { db.exec(`ALTER TABLE compras ADD COLUMN anulada INTEGER NOT NULL DEFAULT 0`) } catch (_) {}
+}
+
+function migrateCaja(db) {
+  try { db.exec(`ALTER TABLE movimientos_caja ADD COLUMN anulado INTEGER NOT NULL DEFAULT 0`) } catch (_) {}
 }
 
 function seedInitialData(db) {
