@@ -10,7 +10,7 @@ export function registerCajaHandlers(ipcMain, db) {
     return db.prepare('SELECT * FROM caja_sesiones WHERE id = ?').get(result.lastInsertRowid)
   })
 
-  ipcMain.handle('caja:cerrar', (_, sesionId) => {
+  ipcMain.handle('caja:cerrar', (_, { sesionId, saldoContado }) => {
     const resumen = db
       .prepare(`
         SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE -monto END), 0) AS movimientos
@@ -27,10 +27,13 @@ export function registerCajaHandlers(ipcMain, db) {
       `)
       .get(sesionId)
 
-    const saldoFinal =
+    const saldoEsperado =
       (sesion?.saldo_inicial ?? 0) +
       (ventasEfectivo?.total ?? 0) +
       (resumen?.movimientos ?? 0)
+
+    // Use physically counted amount if provided, otherwise fall back to computed
+    const saldoFinal = saldoContado !== undefined ? saldoContado : saldoEsperado
 
     db.prepare(`
       UPDATE caja_sesiones

@@ -37,7 +37,7 @@ contextBridge.exposeInMainWorld('api', {
   caja: {
     estado: () => invoke('caja:estado'),
     abrir: (saldoInicial) => invoke('caja:abrir', saldoInicial),
-    cerrar: (sesionId) => invoke('caja:cerrar', sesionId),
+    cerrar: (sesionId, saldoContado) => invoke('caja:cerrar', { sesionId, saldoContado }),
     movimiento: (datos) => invoke('caja:movimiento', datos),
     movimientos: (sesionId) => invoke('caja:movimientos', sesionId),
     saldoSesion: (sesionId) => invoke('caja:saldo-sesion', sesionId),

@@ -33,6 +33,9 @@ export default function Caja() {
   const [saldoInicial, setSaldoInicial] = useState('')
   const [showMovModal, setShowMovModal] = useState(false)
   const [movForm, setMovForm] = useState({ tipo: 'ingreso', monto: '', descripcion: '' })
+  const [showCierreModal, setShowCierreModal] = useState(false)
+  const [montoContado, setMontoContado] = useState('')
+  const [montoRetirar, setMontoRetirar] = useState('')
   const [procesando, setProcesando] = useState(false)
 
   useEffect(() => { cargar() }, [])
@@ -97,17 +100,27 @@ export default function Caja() {
     }
   }
 
-  async function cerrarCaja() {
-    if (!confirm(
-      `¿Cerrar la caja?\n\nSaldo estimado en efectivo: ${fmt(saldoActual)}\n\nEsta acción es definitiva para esta sesión.`
-    )) return
+  function cerrarCaja() {
+    setMontoContado('')
+    setMontoRetirar('')
+    setShowCierreModal(true)
+  }
+
+  async function confirmarCierre() {
+    const contado = Number(montoContado)
     setProcesando(true)
     try {
-      await window.api.caja.cerrar(sesion.id)
+      await window.api.caja.cerrar(sesion.id, contado)
+      setShowCierreModal(false)
       await cargar()
     } finally {
       setProcesando(false)
     }
+  }
+
+  function handleMontoContadoChange(val) {
+    setMontoContado(val)
+    setMontoRetirar(val)
   }
 
   async function registrarMovimiento() {
@@ -404,6 +417,137 @@ export default function Caja() {
           </div>
         )}
       </div>
+
+      {/* ── Modal cierre de turno ── */}
+      {showCierreModal && (() => {
+        const contadoNum = Number(montoContado) || 0
+        const diferencia = contadoNum - saldoActual
+        const sobrante = diferencia > 0
+        const faltante = diferencia < 0
+        return (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="w-full max-w-md rounded-2xl border border-[#2d3348] shadow-2xl" style={{ backgroundColor: '#1e2334' }}>
+
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[#2d3348]">
+                <div>
+                  <h2 className="font-semibold text-white">Resumen de cierre</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">Sesión #{sesion.id}</p>
+                </div>
+                <button
+                  onClick={() => setShowCierreModal(false)}
+                  className="text-slate-500 hover:text-slate-300 transition p-1 rounded-lg hover:bg-[#2d3348]"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="px-6 py-5 space-y-5">
+
+                {/* Desglose */}
+                <div className="rounded-xl border border-[#2d3348] bg-[#161b2a] overflow-hidden">
+                  {[
+                    { label: 'Saldo inicial',           value: sesion.saldo_inicial,         sign: null,  cls: 'text-slate-300' },
+                    { label: 'Ventas en efectivo',       value: saldoDatos.ventas_efectivo,   sign: '+',   cls: 'text-blue-400'  },
+                    { label: 'Ingresos manuales',        value: saldoDatos.total_ingresos,    sign: '+',   cls: 'text-emerald-400' },
+                    { label: 'Egresos del turno',        value: saldoDatos.total_egresos,     sign: '−',   cls: 'text-rose-400'  },
+                  ].map(({ label, value, sign, cls }) => (
+                    <div key={label} className="flex items-center justify-between px-4 py-2.5 border-b border-[#2d3348]/60 last:border-0">
+                      <span className="text-sm text-slate-400">{label}</span>
+                      <span className={`text-sm font-medium tabular-nums ${cls}`}>
+                        {sign && <span className="mr-1 text-slate-500">{sign}</span>}{fmt(value)}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between px-4 py-3 bg-[#1a2035] border-t border-[#2d3348]">
+                    <span className="text-sm font-semibold text-slate-200">Total esperado en caja</span>
+                    <span className="text-base font-bold tabular-nums text-emerald-300">{fmt(saldoActual)}</span>
+                  </div>
+                </div>
+
+                {/* Monto contado */}
+                <div>
+                  <label className={CLS_LABEL}>Monto contado físicamente</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm pointer-events-none">$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={montoContado}
+                      onChange={(e) => handleMontoContadoChange(e.target.value)}
+                      placeholder="0.00"
+                      autoFocus
+                      className={`${CLS_INPUT} pl-7`}
+                    />
+                  </div>
+                </div>
+
+                {/* Diferencia */}
+                {montoContado !== '' && (
+                  <div className={`flex items-center justify-between rounded-lg px-4 py-3 border ${
+                    diferencia === 0
+                      ? 'bg-emerald-900/20 border-emerald-700/40'
+                      : sobrante
+                        ? 'bg-blue-900/20 border-blue-700/40'
+                        : 'bg-rose-900/20 border-rose-700/40'
+                  }`}>
+                    <span className="text-sm font-medium text-slate-300">
+                      {diferencia === 0 ? 'Sin diferencia' : sobrante ? 'Sobrante' : 'Faltante'}
+                    </span>
+                    <span className={`text-base font-bold tabular-nums ${
+                      diferencia === 0 ? 'text-emerald-400' : sobrante ? 'text-blue-400' : 'text-rose-400'
+                    }`}>
+                      {diferencia === 0 ? '—' : `${sobrante ? '+' : '−'}${fmt(Math.abs(diferencia))}`}
+                    </span>
+                  </div>
+                )}
+
+                {/* Monto a retirar */}
+                <div>
+                  <label className={CLS_LABEL}>Monto a retirar</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm pointer-events-none">$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={montoRetirar}
+                      onChange={(e) => setMontoRetirar(e.target.value)}
+                      placeholder="0.00"
+                      className={`${CLS_INPUT} pl-7`}
+                    />
+                  </div>
+                  <p className="mt-1.5 text-xs text-slate-600">
+                    Monto que se extrae físicamente del cajón al cerrar el turno.
+                  </p>
+                </div>
+
+              </div>
+
+              {/* Footer */}
+              <div className="flex gap-3 px-6 py-4 border-t border-[#2d3348]">
+                <button
+                  onClick={() => setShowCierreModal(false)}
+                  className="flex-1 py-2 rounded-lg bg-[#2a2f42] hover:bg-[#323850] border border-[#2d3348] text-slate-200 text-sm font-medium transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarCierre}
+                  disabled={procesando || montoContado === ''}
+                  className="flex-1 py-2 rounded-lg bg-rose-700 hover:bg-rose-600 text-white text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-rose-900/30"
+                >
+                  {procesando ? 'Cerrando...' : 'Confirmar cierre'}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Modal movimiento ── */}
       {showMovModal && (
